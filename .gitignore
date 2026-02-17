@@ -1,0 +1,22 @@
+# Secrets
+config/*.env
+config/*.env.*
+
+# Database (contains runtime state + secrets in telegram_context)
+hydra.db
+hydra.db-journal
+hydra.db-wal
+hydra.db-shm
+
+# Runtime state
+state/
+logs/
+
+# Runtime artifacts
+reports/
+costs/
+logs/
+sessions/
+
+# macOS
+.DS_Store

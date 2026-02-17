@@ -1,0 +1,132 @@
+# HYDRA Agent Configuration
+# Generated: 2026-02-05
+
+agents:
+  milo:
+    name: MILO
+    role: coordinator
+    model: anthropic/claude-sonnet-4-20250514
+    heartbeat_minutes: 15
+    cost_tier: premium
+    active_hours:
+      start: "08:00"
+      end: "23:00"
+    skills:
+      - all
+    description: |
+      Coordinator and squad lead. Routes tasks to specialists,
+      handles decisions, resolves blockers, communicates with user.
+
+  forge:
+    name: FORGE
+    role: dev
+    model: synthetic/hf:deepseek-ai/DeepSeek-V3.2
+    heartbeat_minutes: 30
+    cost_tier: free
+    active_hours:
+      start: "08:00"
+      end: "23:00"
+    skills:
+      - frontend
+      - backend
+      - code-quality
+      - automation
+    task_types:
+      - dev
+      - code
+      - bug
+      - feature
+      - refactor
+      - test
+    description: |
+      Dev specialist. Handles all code-related work including
+      bugs, features, refactoring, testing, and code review.
+
+  scout:
+    name: SCOUT
+    role: research
+    model: synthetic/hf:Qwen/Qwen3-235B-A22B-Instruct-2507
+    heartbeat_minutes: 60
+    cost_tier: free
+    active_hours:
+      start: "08:00"
+      end: "20:00"
+    skills:
+      - marketing
+      - seo
+      - cro
+      - content
+      - strategy
+    task_types:
+      - research
+      - marketing
+      - seo
+      - content
+      - growth
+    description: |
+      Research and marketing specialist. Handles competitive
+      analysis, content creation, SEO, and growth experiments.
+
+  pulse:
+    name: PULSE
+    role: ops
+    model: synthetic/hf:meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8
+    heartbeat_minutes: 30
+    cost_tier: free
+    active_hours:
+      start: "06:00"
+      end: "23:00"
+    skills:
+      - architecture
+      - devops
+      - operations
+      - compliance
+    task_types:
+      - ops
+      - devops
+      - security
+      - infra
+      - automation
+    description: |
+      Ops specialist. Handles DevOps, security, infrastructure,
+      automation, monitoring, and compliance tracking.
+
+# Task routing rules
+routing:
+  # Keywords that trigger specific agent assignment
+  keywords:
+    forge:
+      - fix
+      - build
+      - implement
+      - test
+      - refactor
+      - code
+      - bug
+      - feature
+    scout:
+      - analyze
+      - research
+      - write
+      - content
+      - seo
+      - marketing
+      - competitor
+    pulse:
+      - deploy
+      - security
+      - monitor
+      - automate
+      - infrastructure
+      - compliance
+      - vulnerability
+
+  # Default agent for unmatched tasks
+  default: milo
+
+# Cost limits (per day)
+cost_limits:
+  milo: 10.00  # $10/day max
+  forge: 0.00  # Free (Synthetic API)
+  scout: 0.00  # Free (Synthetic API)
+  pulse: 0.00  # Free (Synthetic API)
