@@ -18,5 +18,8 @@ costs/
 logs/
 sessions/
 
+# Python
+__pycache__/
+
 # macOS
 .DS_Store
