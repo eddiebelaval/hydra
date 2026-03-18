@@ -22,15 +22,9 @@ HYDRA_ENV="$HOME/.hydra/config/telegram.env"
 DATE=$(date +%Y-%m-%d)
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
-# Repos to scan (name|path pairs, pipe-delimited for Bash 3 compat)
-REPO_LIST=(
-    "Homer|$HOME/Development/Homer"
-    "Parallax|$HOME/Development/id8/products/parallax"
-    "Pause|$HOME/Development/id8/products/pause"
-    "ID8Composer|$HOME/Development/id8/id8composer-rebuild"
-    "id8Labs Site|$HOME/Development/id8/id8labs"
-    "Kalshi Bot|$HOME/clawd/projects/kalshi-trading"
-)
+# Shared repo config (single source of truth)
+source "$HOME/.hydra/config/repos.sh"
+REPO_LIST=("${HYDRA_REPOS[@]}")
 
 mkdir -p "$LOG_DIR"
 mkdir -p "$(dirname "$STATE_FILE")"
@@ -85,50 +79,57 @@ with open(state_path, 'w') as f:
 CHANGES_FOUND=false
 ALL_SUMMARIES=""
 
+# Cache dir for commit data (reused by MC signal push, avoids double scan)
+COMMIT_CACHE=$(mktemp -d)
+trap 'rm -rf "$COMMIT_CACHE"' EXIT
+
 for repo_entry in "${REPO_LIST[@]}"; do
-    repo_name="${repo_entry%%|*}"
-    repo_path="${repo_entry##*|}"
+    parse_repo "$repo_entry"
 
     # Skip repos that don't exist
-    if [[ ! -d "$repo_path/.git" ]]; then
-        log "Skipping $repo_name: not a git repo at $repo_path"
+    if [[ ! -d "$REPO_PATH/.git" ]]; then
+        log "Skipping $REPO_NAME: not a git repo at $REPO_PATH"
         continue
     fi
 
     # Get current HEAD SHA
-    current_sha=$(git -C "$repo_path" rev-parse HEAD 2>/dev/null || echo "")
+    current_sha=$(git -C "$REPO_PATH" rev-parse HEAD 2>/dev/null || echo "")
     if [[ -z "$current_sha" ]]; then
-        log "Skipping $repo_name: could not get HEAD SHA"
+        log "Skipping $REPO_NAME: could not get HEAD SHA"
         continue
     fi
 
     # Compare with last-seen SHA
-    last_sha=$(get_last_sha "$repo_name")
+    last_sha=$(get_last_sha "$REPO_NAME")
     if [[ "$current_sha" == "$last_sha" ]]; then
-        log "Skipping $repo_name: no new commits (HEAD=$current_sha)"
+        log "Skipping $REPO_NAME: no new commits (HEAD=$current_sha)"
         continue
     fi
 
     # Get recent commits (last 7 days)
-    commits=$(git -C "$repo_path" log --oneline --since="7 days ago" --max-count=20 2>/dev/null || echo "")
+    commits=$(git -C "$REPO_PATH" log --oneline --since="7 days ago" --max-count=20 2>/dev/null || echo "")
     if [[ -z "$commits" ]]; then
-        log "Skipping $repo_name: no commits in last 7 days"
-        save_sha "$repo_name" "$current_sha"
+        log "Skipping $REPO_NAME: no commits in last 7 days"
+        save_sha "$REPO_NAME" "$current_sha"
         continue
     fi
 
     commit_count=$(echo "$commits" | wc -l | tr -d ' ')
-    log "Found $commit_count new commits in $repo_name"
+    log "Found $commit_count new commits in $REPO_NAME"
     CHANGES_FOUND=true
 
+    # Cache commit data for MC signal push (avoids re-scanning)
+    echo "$commit_count" > "$COMMIT_CACHE/$REPO_NAME.count"
+    echo "$commits" | head -1 | cut -c9- > "$COMMIT_CACHE/$REPO_NAME.latest"
+
     # Collect raw commits for summarization
-    ALL_SUMMARIES+="### $repo_name ($commit_count commits)
+    ALL_SUMMARIES+="### $REPO_NAME ($commit_count commits)
 $commits
 
 "
 
     # Save new SHA
-    save_sha "$repo_name" "$current_sha"
+    save_sha "$REPO_NAME" "$current_sha"
 done
 
 # ============================================================================
@@ -287,4 +288,18 @@ print(f"Brain updated: {len(summary)} chars between markers")
 PYEOF
 
 log "TECHNICAL_BRAIN.md updated successfully"
+
+# ============================================================================
+# PUSH SIGNALS TO MISSION CONTROL (uses cached commit data from scan above)
+# ============================================================================
+
+log "Pushing activity signals to Mission Control..."
+push_mc_signals heartbeat 24 "" "24 hours ago" "$COMMIT_CACHE"
+log "Mission Control signals complete"
+
+# Purge expired signals (daily housekeeping)
+if [[ -x "$MC_CLI" ]]; then
+    "$MC_CLI" purge 2>/dev/null || true
+fi
+
 echo "Brain updated with recent git activity for $DATE"

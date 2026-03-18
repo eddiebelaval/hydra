@@ -50,6 +50,36 @@ if [[ -z "$TODAYS_PRIORITIES" ]]; then
 fi
 
 # ============================================================================
+# GATHER TODAY'S GIT ACTIVITY
+# ============================================================================
+
+# Shared repo config (single source of truth)
+source "$HOME/.hydra/config/repos.sh"
+
+TODAYS_COMMITS=""
+COMMIT_CACHE=$(mktemp -d)
+trap 'rm -rf "$COMMIT_CACHE"' EXIT
+
+for repo_entry in "${HYDRA_REPOS[@]}"; do
+    parse_repo "$repo_entry"
+    if [[ -d "$REPO_PATH/.git" ]]; then
+        commits=$(git -C "$REPO_PATH" log --oneline --since="today" --max-count=10 2>/dev/null || echo "")
+        if [[ -n "$commits" ]]; then
+            commit_count=$(echo "$commits" | wc -l | tr -d ' ')
+            TODAYS_COMMITS+="$REPO_NAME ($commit_count):
+$(echo "$commits" | sed 's/^/  /')
+
+"
+            # Cache for MC signal push (avoids double scan)
+            echo "$commit_count" > "$COMMIT_CACHE/$REPO_NAME.count"
+            echo "$commits" | head -1 | cut -c9- > "$COMMIT_CACHE/$REPO_NAME.latest"
+        fi
+    fi
+done
+
+log "Today's git activity: $(echo "$TODAYS_COMMITS" | wc -l | tr -d ' ') lines"
+
+# ============================================================================
 # BUILD REVIEW PROMPT
 # ============================================================================
 
@@ -57,8 +87,15 @@ PROMPT="Evening check-in!
 
 Your 3 for today were:
 $TODAYS_PRIORITIES
+"
 
-How'd it go? (Reply with status for each: done, pushed, dropped, or a note)
+if [[ -n "$TODAYS_COMMITS" ]]; then
+    PROMPT+="
+What shipped today:
+$TODAYS_COMMITS"
+fi
+
+PROMPT+="How'd it go? (Reply with status for each: done, pushed, dropped, or a note)
 
 Example: \"1 done, 2 pushed to tomorrow, 3 started but need more time\""
 
@@ -91,6 +128,16 @@ log "Evening review thread created: $THREAD_ID"
     --entity-type conversation_thread --entity-id "$THREAD_ID" 2>/dev/null || true
 
 log "Evening review prompt sent"
+
+# ============================================================================
+# PUSH DAILY SUMMARY TO MISSION CONTROL (uses cached commit data)
+# ============================================================================
+
+if [[ -n "$TODAYS_COMMITS" ]]; then
+    log "Pushing daily summary to Mission Control..."
+    push_mc_signals observation 48 "Daily:" "today" "$COMMIT_CACHE"
+    log "Mission Control daily signals complete"
+fi
 
 # Log activity
 ACTIVITY_ID=$(python3 -c "import uuid; print(str(uuid.uuid4()))" 2>/dev/null || echo "act-$(date +%s)")

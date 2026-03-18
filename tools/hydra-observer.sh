@@ -31,15 +31,9 @@ LOG_FILE="$LOG_DIR/observer-$(date +%Y-%m-%d).log"
 DATE=$(date +%Y-%m-%d)
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
-# Repos to scan (same list as brain-updater, pipe-delimited for Bash 3 compat)
-REPO_LIST=(
-    "Homer|$HOME/Development/Homer"
-    "Parallax|$HOME/Development/id8/products/parallax"
-    "Pause|$HOME/Development/id8/products/pause"
-    "ID8Composer|$HOME/Development/id8/id8composer-rebuild"
-    "id8Labs Site|$HOME/Development/id8/id8labs"
-    "Kalshi Bot|$HOME/clawd/projects/kalshi-trading"
-)
+# Shared repo config (single source of truth)
+source "$HOME/.hydra/config/repos.sh"
+REPO_LIST=("${HYDRA_REPOS[@]}")
 
 mkdir -p "$LOG_DIR" "$(dirname "$STATE_FILE")" "$(dirname "$OBSERVATIONS_MD")"
 
@@ -158,35 +152,34 @@ fi
 
 GIT_EVENTS=""
 for repo_entry in "${REPO_LIST[@]}"; do
-    repo_name="${repo_entry%%|*}"
-    repo_path="${repo_entry##*|}"
+    parse_repo "$repo_entry"
 
-    if [[ ! -d "$repo_path/.git" ]]; then
+    if [[ ! -d "$REPO_PATH/.git" ]]; then
         continue
     fi
 
-    current_sha=$(git -C "$repo_path" rev-parse HEAD 2>/dev/null || echo "")
+    current_sha=$(git -C "$REPO_PATH" rev-parse HEAD 2>/dev/null || echo "")
     if [[ -z "$current_sha" ]]; then
         continue
     fi
 
-    last_sha=$(get_git_sha "$repo_name")
+    last_sha=$(get_git_sha "$REPO_NAME")
     if [[ "$current_sha" == "$last_sha" ]]; then
         continue
     fi
 
     # Get commits since last observation (max 10, last 6 hours)
-    commits=$(git -C "$repo_path" log --oneline --since="6 hours ago" --max-count=10 2>/dev/null || echo "")
+    commits=$(git -C "$REPO_PATH" log --oneline --since="6 hours ago" --max-count=10 2>/dev/null || echo "")
     if [[ -n "$commits" ]]; then
         commit_count=$(echo "$commits" | wc -l | tr -d ' ')
-        GIT_EVENTS+="$repo_name ($commit_count commits):
+        GIT_EVENTS+="$REPO_NAME ($commit_count commits):
 $commits
 
 "
-        log "Git: $repo_name has $commit_count recent commits"
+        log "Git: $REPO_NAME has $commit_count recent commits"
     fi
 
-    save_git_sha "$repo_name" "$current_sha"
+    save_git_sha "$REPO_NAME" "$current_sha"
 done
 
 if [[ -n "$GIT_EVENTS" ]]; then
@@ -420,6 +413,28 @@ PYEOF
 )
 
 log "Stored $STORED_COUNT observations in SQLite"
+
+# Post CRITICAL observations to the agent board for lateral coordination
+BOARD_POST="$HYDRA_ROOT/tools/board-post.sh"
+if [[ -f "$BOARD_POST" ]]; then
+    CRITICAL_OBS=$(sqlite3 "$HYDRA_DB" "
+        SELECT content FROM observations
+        WHERE priority = 'critical'
+        AND date = '$DATE'
+        AND timestamp >= datetime('now', '-20 minutes')
+        LIMIT 5;
+    " 2>/dev/null || echo "")
+
+    if [[ -n "$CRITICAL_OBS" ]]; then
+        while IFS= read -r obs_line; do
+            if [[ -n "$obs_line" ]]; then
+                "$BOARD_POST" "coordination" "observer" "$obs_line" --tags "critical,auto" 2>/dev/null || true
+            fi
+        done <<< "$CRITICAL_OBS"
+        BOARD_COUNT=$(echo "$CRITICAL_OBS" | grep -c . || true)
+        log "Posted $BOARD_COUNT critical observations to agent board"
+    fi
+fi
 
 # ============================================================================
 # RENDER PLAINTEXT OBSERVATIONS.MD

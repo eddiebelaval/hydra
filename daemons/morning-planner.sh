@@ -43,7 +43,45 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
 }
 
+# Shared repo config (single source of truth)
+source "$HOME/.hydra/config/repos.sh"
+
 log "=== Morning planner started ==="
+
+# ============================================================================
+# DUPLICATE PREVENTION + GYM GATE
+# ============================================================================
+
+WELLNESS_STATE="$HYDRA_ROOT/state/wellness-state.json"
+PLANNER_SENT_FILE="$HYDRA_ROOT/state/planner-sent-$DATE.flag"
+
+# Skip if already sent today (prevents double-send from clock + gym handler)
+if [[ -f "$PLANNER_SENT_FILE" ]]; then
+    log "Already sent today (flag file exists). Skipping."
+    exit 0
+fi
+
+# Check gym phase — if pre_gym and before 11 AM, send reminder instead
+GYM_PHASE=$(python3 -c "
+import json
+try:
+    state = json.load(open('$WELLNESS_STATE'))
+    if state.get('date') == '$DATE':
+        print(state.get('phase', 'pre_gym'))
+    else:
+        print('unknown')
+except:
+    print('unknown')
+" 2>/dev/null || echo "unknown")
+
+NOW_H=$(date +%-H)
+if [[ "$GYM_PHASE" == "pre_gym" ]] && [[ "$NOW_H" -lt 11 ]]; then
+    log "Gym not cleared yet (phase=$GYM_PHASE, hour=$NOW_H). Sending reminder."
+    "$NOTIFY" normal "Waiting for Gym" "Your priorities are ready — but gym first.
+
+Reply to the gym checkpoint message when you're done." "" 2>/dev/null || true
+    exit 0
+fi
 
 # ============================================================================
 # GATHER CONTEXT FOR SUGGESTIONS
@@ -96,7 +134,36 @@ ACTIVE_HIGH=$(sqlite3 "$HYDRA_DB" "
     LIMIT 5;
 " 2>/dev/null || echo "")
 
-log "Context gathered: yesterday_priorities=$(echo "$YESTERDAY_PRIORITIES" | wc -l | tr -d ' ') obs=$(echo "$RECENT_OBS" | wc -l | tr -d ' ')"
+# Agent board posts (last 24h — what agents discovered overnight)
+BOARD_POSTS=$(sqlite3 "$HYDRA_DB" "
+    SELECT channel || ': ' || message
+    FROM agent_board
+    WHERE created_at >= datetime('now', '-24 hours')
+    AND parent_id IS NULL
+    ORDER BY created_at DESC
+    LIMIT 8;
+" 2>/dev/null || echo "")
+
+# Recent git activity from brain-updater (runs at 6 AM, before this)
+BRAIN_FILE="$HYDRA_ROOT/TECHNICAL_BRAIN.md"
+GIT_ACTIVITY=""
+if [[ -f "$BRAIN_FILE" ]]; then
+    GIT_ACTIVITY=$(sed -n '/<!-- BRAIN-UPDATER:START -->/,/<!-- BRAIN-UPDATER:END -->/{
+        /<!-- BRAIN-UPDATER/d
+        /^## Recent Git Activity/d
+        /^\*Auto-updated/d
+        p
+    }' "$BRAIN_FILE" 2>/dev/null || echo "")
+    GIT_ACTIVITY=$(echo "$GIT_ACTIVITY" | sed '1{/^$/d;}')
+fi
+
+# Mission Control signals (active alerts, observations -- MC_CLI from repos.sh)
+MC_SIGNALS=""
+if [[ -x "$MC_CLI" ]]; then
+    MC_SIGNALS=$("$MC_CLI" signals --pretty 2>/dev/null || echo "")
+fi
+
+log "Context gathered: yesterday_priorities=$(echo "$YESTERDAY_PRIORITIES" | wc -l | tr -d ' ') obs=$(echo "$RECENT_OBS" | wc -l | tr -d ' ') board=$(echo "$BOARD_POSTS" | wc -l | tr -d ' ') git_activity=$(echo "$GIT_ACTIVITY" | wc -l | tr -d ' ') mc_signals=$(echo "$MC_SIGNALS" | wc -l | tr -d ' ')"
 
 # ============================================================================
 # GENERATE AI SUGGESTIONS (Claude Haiku)
@@ -110,6 +177,9 @@ if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
     export HAIKU_GOALS="$GOALS_EXCERPT"
     export HAIKU_STALE="$STALE_TASKS"
     export HAIKU_ACTIVE="$ACTIVE_HIGH"
+    export HAIKU_BOARD="$BOARD_POSTS"
+    export HAIKU_GIT="$GIT_ACTIVITY"
+    export HAIKU_MC="$MC_SIGNALS"
     export HAIKU_DAY="$DAY_NAME"
 
     SUGGESTIONS=$(python3 << 'PYEOF'
@@ -121,6 +191,9 @@ observations = os.environ.get("HAIKU_RECENT_OBS", "none")
 goals = os.environ.get("HAIKU_GOALS", "none")
 stale = os.environ.get("HAIKU_STALE", "none")
 active = os.environ.get("HAIKU_ACTIVE", "none")
+board = os.environ.get("HAIKU_BOARD", "none")
+git_activity = os.environ.get("HAIKU_GIT", "none")
+mc_signals = os.environ.get("HAIKU_MC", "none")
 day = os.environ.get("HAIKU_DAY", "today")
 
 prompt = f"""You are HYDRA, Eddie Belaval's AI co-founder system. It's {day} morning.
@@ -128,9 +201,13 @@ prompt = f"""You are HYDRA, Eddie Belaval's AI co-founder system. It's {day} mor
 Based on the context below, suggest 3 priorities for Eddie today. Be specific and actionable.
 Use co-founder voice — direct, slightly opinionated, referencing real project context.
 If something was pushed or dropped yesterday, nudge about it. If a goal is being neglected, call it out.
+Reference the actual git activity — what shipped recently matters for deciding what's next.
 
 YESTERDAY'S PRIORITIES:
 {yesterday if yesterday else "No priorities set yesterday."}
+
+RECENT GIT ACTIVITY (last 7 days):
+{git_activity if git_activity else "No recent git activity."}
 
 RECENT OBSERVATIONS:
 {observations if observations else "No recent observations."}
@@ -143,6 +220,12 @@ STALE TASKS (pending 3+ days):
 
 HIGH PRIORITY ACTIVE:
 {active if active else "None"}
+
+AGENT BOARD (what agents discovered overnight):
+{board if board else "No overnight agent activity."}
+
+MISSION CONTROL SIGNALS (active alerts/observations across portfolio):
+{mc_signals if mc_signals else "No active MC signals."}
 
 Respond with exactly 3 numbered suggestions, one per line. Keep each under 60 chars. No preamble."""
 
@@ -179,7 +262,11 @@ fi
 # BUILD TELEGRAM PROMPT
 # ============================================================================
 
-PROMPT="Morning, Eddie! Happy $DAY_NAME.
+PROMPT="Morning, Eddie. Happy $DAY_NAME.
+
+Walk the dog. Gym. Breakfast. Then open the terminal.
+
+Once you're back, here's the picture:
 
 "
 
@@ -242,6 +329,12 @@ sqlite3 "$HYDRA_DB" "
     INSERT INTO activities (id, activity_type, entity_type, entity_id, description)
     VALUES ('$ACTIVITY_ID', 'morning_planner_sent', 'conversation_thread', '$THREAD_ID', 'Morning planner prompt sent to Eddie');
 " 2>/dev/null
+
+# Mark as sent today (duplicate prevention)
+touch "$PLANNER_SENT_FILE"
+
+# Clean up flag files older than 7 days
+find "$HYDRA_ROOT/state" -name "planner-sent-*.flag" -mtime +7 -delete 2>/dev/null || true
 
 log "=== Morning planner complete ==="
 echo "Morning planner: prompt sent, awaiting Eddie's reply"

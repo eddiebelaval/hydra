@@ -343,11 +343,12 @@ $(echo "$BLOCKED" | head -3 | while read -r line; do [[ -n "$line" ]] && echo "-
 "
 fi
 
-# Project activity (condensed for Telegram)
+# Project activity (include actual bullets for Telegram)
 if [[ -n "$PROJECT_ACTIVITY" ]]; then
-    # Extract just the bold project names for a compact summary
-    PROJECT_NAMES=$(echo "$PROJECT_ACTIVITY" | grep -oE '^\*\*[^*]+\*\*' | tr -d '*' | paste -sd, - | sed 's/,/, /g')
-    TELEGRAM_MSG+="Projects active: $PROJECT_NAMES
+    # Strip markdown bold markers for Telegram plaintext, keep bullets
+    ACTIVITY_CLEAN=$(echo "$PROJECT_ACTIVITY" | sed 's/\*\*//g' | head -20)
+    TELEGRAM_MSG+="Recent Activity:
+$ACTIVITY_CLEAN
 
 "
 fi
