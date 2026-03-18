@@ -19,48 +19,55 @@ FORMAT RULES (responses go to Telegram):
 
 <!-- BRAIN-UPDATER:START -->
 ## Recent Git Activity
-*Auto-updated: 2026-02-16*
+*Auto-updated: 2026-03-18*
+
+**Homer**
+- Fixed **video autoplay race condition** on landing page
+- Completed **SEO audit** — added canonicals, meta tags, noindex, and viewport fixes
+- Resolved **CI build failure** with lazy Supabase initialization in email-capture
+- Disabled **scroll animations on mobile** viewports and filtered properties with placeholder addresses
+- Redirected broken agent registration and footer links to **waitlist** with updated hero CTA
 
 **Parallax**
-- Added **Ava identity system** with comprehensive design pass, graduated dividers, and live orb canvas
-- Restored full **landing page** with 10 sections including LensGrid, ModePreview, and MeltDemoPlayer
-- Shipped **Remotion demo video** with 5-block composition and module system architecture
-- Implemented **Ava consciousness architecture** with filesystem-based self-awareness (~ava/ structure)
-- Fixed insight extraction JSON truncation and resolved 37 stale tests across unit and E2E suites
-
-**id8Labs Site**
-- Added **Consciousness as Filesystem** research paper documenting structural framework for machine cognition
+- Implemented **Haiku-powered message compaction** for solo and ava routes
+- Added **Guided Clarity System** — mental model framework for Ava with 31 comprehensive tests
+- Consolidated **Lab navigation** — merged changelog, update log, and Lab into single /lab route
+- Audited and fixed **Android mobile UI/UX** — overflow, touch targets, and responsive issues
+- Removed stale TypeScript expect-error directives and fixed HTMLMainElement type safety
 <!-- BRAIN-UPDATER:END -->
 
 <!-- REFLECTOR:START -->
 ## Behavioral Patterns
-*Auto-updated: 2026-02-16 by HYDRA Reflector*
+*Auto-updated: 2026-03-18 by HYDRA Reflector*
 
-- **[CRITICAL]** HYDRA memory system research-to-implementation cycle compressing dangerously fast—Mastra research at 10:30, Observer architecture at 10:45, Phase 1 implementation at 11:00 indicating insufficient design validation time
-- **[CRITICAL]** Focus score plateau at 33% across three consecutive days (2026-02-11, 2026-02-12, 2026-02-13) despite varying workload suggests systemic productivity blocker unrelated to task volume requiring root cause investigation
-- **[CRITICAL]** Post-milestone recovery pattern: 13% focus score degradation (46%→33%) across 2026-02-11 to 2026-02-12 coincides with 10-commit launch prep burst suggesting burnout risk after Stage 9 completion
-- **[CRITICAL]** Stage 10 emerged without explicit transition documentation—health endpoint shipped 2026-02-11 11:05 while Stage 9 still active 2026-02-12 17:00 indicating overlapping milestone execution model
-- **[CRITICAL]** Realtime bug pattern emerging across multiple features (endSession, conductor race conditions) fixed within 45 minutes using refreshSession pattern indicating systematic architecture weakness
-- **[CRITICAL]** Focus score inversely correlating with technical depth—33% focus during highest-velocity implementation day suggests metric misalignment with deep work patterns
-- **[CRITICAL]** Repository cleanup and HYDRA architecture overhaul accelerating with Observer/Reflector pattern implementation showing rapid prototyping velocity
-- **[CRITICAL]** Strategic pivot toward production-grade observability system with two-tier compression (Haiku→Sonnet) indicating maturation from prototype to platform
-- **[MODERATE]** Multi-stage parallel execution model solidifying—Stage 10 health endpoint shipped while Stage 9 launch prep active, followed by Stage 5 Feature Blocks fixes same day indicating intentional non-linear milestone progression strategy
-- **[MODERATE]** SCOUT marketing streak decay extends to third consecutive day at 0 days across 2026-02-11, 2026-02-12, 2026-02-13 morning briefings indicating abandoned marketing commitment requiring explicit priority reset decision
-- **[MODERATE]** Conflict resolution architecture evolving toward intelligence-driven model—14-lens prompt system, Strategy Arena backtesting, Intelligence Network integration within 24 hours suggesting pivot from simple conflict handling to decision support framework
-- **[MODERATE]** Repository cleanup initiatives consistently deprioritized—chore/repo-cleanup branch started 2026-02-11 10:23 but no follow-up commits observed suggesting technical debt accumulation acceptance pattern
-- **[MODERATE]** Intelligence Network integration shipped as cohesive system—persona architecture, UI, and arena expansion delivered in synchronized 5-minute commit intervals 17:05-17:10 suggesting feature completion maturity
-- **[MODERATE]** Documentation debt repayment pattern: three BUILDING.md updates within 20 minutes (17:15-17:30) immediately following feature commits indicating retrospective documentation workflow
-- **[MODERATE]** Test infrastructure hardening follows feature shipping—missing user_id test fixtures discovered and fixed 17:25 after Intelligence Network integration 17:05-17:10 showing test-after-feature ordering
-- **[MODERATE]** Merge consolidation pattern: two PRs (#25 full-test-coverage, #26 self-narrating-landing) integrated within 10 minutes suggesting batch integration workflow reduces context switching cost
-- **[MODERATE]** Feature development velocity sustained at 15-minute intervals during 09:00-09:45 window shipping four Conflict Intelligence components suggesting optimal flow state
-- **[MODERATE]** Architecture documentation lagging implementation by hours—V3 Conflict Intelligence features shipped 09:00-09:45 but BUILDING.md updated at 11:00 risking knowledge debt
-- **[MODERATE]** Stage progression pattern showing non-linear jumps—Stage 5 Feature Blocks to Stage 10 health monitoring without intermediate stages documented suggesting either stage definition gaps or tracking inconsistencies
-- **[MODERATE]** Marketing discipline breakdown with SCOUT streak at 0 days correlating with intense technical deep-work sessions
-- **[MODERATE]** Morning briefings consistently surfacing work-in-progress vs. published ratio as key metric (MILO 2P/1WIP pattern)
-- **[MODERATE]** System observability becoming first-class concern with health monitoring and event buffer architecture
-- **[LOW]** Morning briefing instructs "define ONE priority task" on 2026-02-12 and 2026-02-13 indicating repeated failure to establish daily focus suggesting ineffective priority-setting mechanism
-- **[LOW]** Agent utilization asymmetry persists—FORGE and PULSE remain idle while MILO handles 3 concurrent tasks indicating workload distribution opportunity
-- **[LOW]** Cross-project context switching within single morning session—Parallax assessment fixes, V3 Conflict Intelligence, V4 Strategy Arena, HYDRA Observer all active 08:00-11:40 indicating either fragmented attention or effective parallel mental models
+- **[CRITICAL]** Telegram became primary work interface: 18 low-priority "message_received" events logged 2026-03-08 19:14 (15-minute window), suggesting shift from structured task execution to reactive chat-based workflow
+- **[CRITICAL]** Task system integrity failure: "submitted" task marked done 2026-03-13 00:03 returned "task not found" despite dispatch confirmation—indicates database corruption or sync failure between task creation and completion tracking
+- **[CRITICAL]** Live trading transition executed without graduation: Kalshi Bot moved to live trading with 20% drawdown threshold 2026-03-12 08:40 despite paper trading removal—no graduation report or backtest validation documented before capital risk
+- **[CRITICAL]** Homer Q1 flagship goal (2-3 paying users) repeated verbatim across 5 days without progress metrics or conversion funnel updates—static goal restatement without execution signals
+- **[CRITICAL]** Disk space crisis acceleration: 11GB→8GB→5GB→0GB across 4 days (2026-03-05 to 2026-03-10) with auto-cleanup decision made 2026-03-06 08:04 but never implemented—critical infrastructure blocker ignored despite escalating alerts
+- **[CRITICAL]** Parallax hackathon deadline drift: Feb 16 submission deadline mentioned across 6 days (2026-03-05 through 2026-03-10) with no completion signal or deadline extension recorded—indicates missed deadline with no retrospective or pivot decision
+- **[CRITICAL]** Multi-project context switching pattern: Homer (9 services + compliance + pricing), Kalshi Bot (6 PRs merged 2026-03-06), Parallax (version gating + Reading Nook), Rune (launch blocked), id8Labs (finance module)—5 active products without prioritization hierarchy
+- **[CRITICAL]** Deployment pipeline instability: version auto-bumps executed 6+ times across week (1.4.1→1.10.0→1.11.0→1.14.1→1.15.0→1.17.1) with multiple same-day releases (2026-03-05: 1.10.0, 1.11.0, 1.15.0) suggests CI/CD configuration error causing premature releases without consolidation
+- **[CRITICAL]** Feature gate architecture shift: premium tier boundaries established 2026-03-01 (cycles API, self-fetching components, feature flags bd8d31c) then immediately revised 2026-03-01 13:00 ("Premium depth + memory edit for all tiers") indicates pricing model uncertainty threatening go-to-market strategy
+- **[CRITICAL]** Morning planner automation failure: 80+ duplicate "prompt sent to Eddie" entries across all days with identical timestamps (all at 13:00) signals broken cron job or message queue backup—coordination system reliability compromised
+- **[CRITICAL]** Admin authentication rework cycle: 4 separate implementations in 48 hours (2026-03-04 07:50 debug endpoint, 2026-03-04 13:00 email-based auth, 2026-03-04 13:00 diagnostic endpoint, 2026-03-04 13:00 protection routes) suggests security model uncertainty requiring immediate architecture decision
+- **[MODERATE]** Homer authentication became stability bottleneck: SSR hydration race conditions, OTP/PKCE issues, cookie races, infinite render loops fixed 2026-03-12 08:40—suggests auth system shipped before edge case hardening complete
+- **[MODERATE]** External research consumption pattern emerging: shared 4 repos/articles in 3 days (2026-03-07 autoresearch, 2026-03-08 everything-claude-code v1.8.0, 2026-03-09 Anthropic skill guide, 2026-03-12 agency-agents)—knowledge intake without documented application to active projects
+- **[MODERATE]** Kalshi Bot operational instrumentation wave: sensory monitor with 7-sense health checks every 15min, Supabase analytics pipeline, IBKR integration, trade sync fixes all shipped 2026-03-11-12—production hardening sprint after live trading decision
+- **[MODERATE]** Homer Stage 9 launch prep concentrated on Feb 9: 10 commits including compliance shield, pricing tiers, agent brand control, buyer analytics—major feature surface area expansion in single day suggests pre-deadline sprint
+- **[MODERATE]** Focus score collapse: 46%→33% decline with MILO flagged across 4 consecutive days (2026-03-05, 2026-03-07, 2026-03-08, 2026-03-09) but no corrective action or capacity reduction observed—productivity signal ignored
+- **[MODERATE]** Kalshi Bot operational maturity surge: 6 feature PRs merged in 48 hours (2026-03-06: PRs #57-63) including self-modification capability, paper balance flag, conversation memory, and governance fixes—suggests concentrated sprint before context switch
+- **[MODERATE]** Homer Deal Simulator shipped 2026-03-11 with 9 services including NotaryCoordinationService but no user testing or agent onboarding plan mentioned—enterprise feature launch without documented go-to-market execution
+- **[MODERATE]** Strategic pivot revelation: 2026-03-08 20:27 decision to abandon unicorn product vision for "stacking useful products" approach but no portfolio rationalization or sunset decisions followed—philosophy shift without execution plan
+- **[MODERATE]** Rune public launch blocker: "PR #1 open, awaiting merge and Supabase setup" repeated verbatim 5 times across 7 days (2026-03-05 through 2026-03-10) with zero progress—launch-blocking task deprioritized without explanation
+- **[MODERATE]** Academy content expansion velocity: 3 major additions in 72 hours (2026-02-28 Nervous System section PR #150, 2026-03-05 Reading Nook with 44 books, 2026-03-05 pedagogical arc restructure #207) without recorded user feedback indicates content-first rather than validation-driven approach
+- **[MODERATE]** API model migration pattern: Sonnet 4.5→4.6 upgrade executed 2026-03-01 with Opus reserved for mediation, but conversational routing shift required 3 separate commits (route updates, test fixes, architect expectations) suggests inadequate abstraction layer for model switching
+- **[MODERATE]** Disk space degradation trend: 44GB free 2026-03-05 → 19GB 2026-02-27 → 17GB 2026-02-28 → 12GB 2026-03-02 → 11GB 2026-03-05 indicates 33GB consumption in 6 days (5.5GB/day burn rate) with no cleanup actions observed—infrastructure maintenance deferred
+- **[MODERATE]** Documentation debt accumulation: BUILDING.md and JOURNEY.md updated 8+ times across week (2026-02-27, 2026-03-01, 2026-03-04, 2026-03-05 multiple times) suggests docs treated as post-hoc rather than inline—development velocity outpacing knowledge capture
+- **[MODERATE]** Scheduled sessions feature implementation pattern: full-stack build completed 2026-03-01 10:25, then Ava scheduling concierge overlay shipped 2026-03-05 with conversation-driven creation—suggests UI-first approach added intelligence layer after infrastructure complete
+- **[MODERATE]** Command execution error pattern: incomplete task-id parameters logged 2026-02-27 09:07 and 2026-03-04 07:50 with identical error signatures suggests persistent Telegram bot command parsing issue affecting task completion workflow
+- **[LOW]** Morning planner prompt noise: 45+ duplicate "sent to Eddie" observations across 7 days with varying priority tags (critical/moderate/low)—logging system creating false signal density in observation stream
+- **[LOW]** Marketing streak permanently at 0 days across entire week (2026-03-05 through 2026-03-11) with SCOUT assigned rebuild task but no completion signals—GTM execution completely stalled despite revenue goals
 <!-- REFLECTOR:END -->
 
 ## 1. HYDRA - AI-Human Operating System
@@ -113,11 +120,11 @@ Each agent has a launchd plist (e.g., `com.hydra.agent-milo.plist`) that runs `a
 - **normal**: macOS notification only
 - **silent**: Logged only
 
-**Security:** Chat ID whitelist (only Eddie's chat 8516762725), bot token in `~/.hydra/config/telegram.env`, token-safe curl (passed via stdin, never in ps output), input sanitization via Python JSON escaping.
+**Security:** Chat ID whitelist (configured in telegram.env), bot token in `~/.hydra/config/telegram.env`, token-safe curl (passed via stdin, never in ps output), input sanitization via Python JSON escaping.
 
 **Two Telegram Bots (separate channels, no conflicts):**
-- **HYDRA bot** (`@hydra_id8_bot`, token `8006340481:...`) -- System commands: status, tasks, costs, ask (CTO brain), approve/reject. Polled by `telegram-listener.sh`.
-- **MILO bot** (token `8599107151:...`) -- MILO's conversational personality via OpenClaw gateway. Polled by OpenClaw's Telegram plugin.
+- **HYDRA bot** (`@hydra_id8_bot`) -- System commands: status, tasks, costs, ask (CTO brain), approve/reject. Polled by `telegram-listener.sh`.
+- **MILO bot** (OpenClaw) -- MILO's conversational personality via OpenClaw gateway. Polled by OpenClaw's Telegram plugin.
 Each bot has its own token, so there's no `getUpdates` conflict. If 409 errors appear on HYDRA's listener, it means duplicate listener instances (lock issue), NOT OpenClaw interference. The listener has startup conflict detection (3 probe polls) and runtime detection (5 consecutive 409s trigger alert + exit). Conflict markers written to `~/.hydra/state/telegram-conflict.txt`.
 
 ### Natural Language Parsing (Two-Tier)
@@ -701,9 +708,9 @@ The default model for agents is **Kimi K2.5** -- free, multimodal, 256K context 
 ### Relationship to HYDRA
 HYDRA and OpenClaw/MILO are **separate systems with separate Telegram bots**:
 
-**HYDRA** (`@hydra_id8_bot`, token `8006340481`): System commands, CTO brain, TTS voice notes. Shell scripts call Anthropic API directly. `telegram-listener.sh` long-polls HYDRA's bot.
+**HYDRA** (`@hydra_id8_bot`): System commands, CTO brain, TTS voice notes. Shell scripts call Anthropic API directly. `telegram-listener.sh` long-polls HYDRA's bot.
 
-**MILO** (OpenClaw bot, token `8599107151`): MILO's conversational personality as an agent. OpenClaw gateway routes to Claude Sonnet. OpenClaw's Telegram plugin long-polls MILO's bot.
+**MILO** (OpenClaw bot): MILO's conversational personality as an agent. OpenClaw gateway routes to Claude Sonnet. OpenClaw's Telegram plugin long-polls MILO's bot.
 
 **No cross-conflict** -- different bot tokens, different consumers, different Telegram chats.
 
