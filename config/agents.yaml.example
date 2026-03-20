@@ -1,0 +1,135 @@
+# HYDRA Agent Configuration (Example)
+#
+# Copy this file to agents.yaml and customize for your setup.
+#
+# Each agent needs:
+#   model: API model identifier (anthropic/* for paid, synthetic/hf:* for free HuggingFace)
+#   heartbeat_minutes: How often the agent wakes to check for work
+#   cost_tier: 'premium' (paid API calls) or 'free' (HuggingFace Inference)
+#   skills: Array of capability categories used for task routing
+#   task_types: Array of task types this agent can handle
+#
+# The coordinator agent (role: coordinator) handles decisions and routing.
+# Specialist agents handle execution in their domain.
+
+agents:
+  coordinator:
+    name: COORDINATOR
+    role: coordinator
+    model: anthropic/claude-sonnet-4-20250514
+    heartbeat_minutes: 15
+    cost_tier: premium
+    active_hours:
+      start: "08:00"
+      end: "23:00"
+    skills:
+      - all
+    description: |
+      Squad lead. Routes tasks to specialists, handles decisions,
+      resolves blockers, communicates with user.
+
+  dev:
+    name: DEV
+    role: dev
+    model: synthetic/hf:deepseek-ai/DeepSeek-V3.2
+    heartbeat_minutes: 30
+    cost_tier: free
+    active_hours:
+      start: "08:00"
+      end: "23:00"
+    skills:
+      - frontend
+      - backend
+      - code-quality
+      - automation
+    task_types:
+      - dev
+      - code
+      - bug
+      - feature
+      - refactor
+      - test
+    description: |
+      Dev specialist. Handles code-related work including
+      bugs, features, refactoring, testing, and code review.
+
+  research:
+    name: RESEARCH
+    role: research
+    model: synthetic/hf:Qwen/Qwen3-235B-A22B-Instruct-2507
+    heartbeat_minutes: 60
+    cost_tier: free
+    active_hours:
+      start: "08:00"
+      end: "20:00"
+    skills:
+      - marketing
+      - seo
+      - content
+      - strategy
+    task_types:
+      - research
+      - marketing
+      - content
+      - growth
+    description: |
+      Research and content specialist. Handles competitive
+      analysis, content creation, and growth experiments.
+
+  ops:
+    name: OPS
+    role: ops
+    model: synthetic/hf:meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8
+    heartbeat_minutes: 30
+    cost_tier: free
+    active_hours:
+      start: "06:00"
+      end: "23:00"
+    skills:
+      - architecture
+      - devops
+      - operations
+    task_types:
+      - ops
+      - devops
+      - security
+      - infra
+    description: |
+      Ops specialist. Handles DevOps, security, infrastructure,
+      and monitoring.
+
+# Task routing rules
+routing:
+  # Keywords that trigger specific agent assignment
+  keywords:
+    dev:
+      - fix
+      - build
+      - implement
+      - test
+      - refactor
+      - code
+      - bug
+      - feature
+    research:
+      - analyze
+      - research
+      - write
+      - content
+      - marketing
+    ops:
+      - deploy
+      - security
+      - monitor
+      - automate
+      - infrastructure
+
+  # Default agent for unmatched tasks
+  default: coordinator
+
+# Cost limits (per day, in USD)
+cost_limits:
+  coordinator: 10.00
+  dev: 0.00
+  research: 0.00
+  ops: 0.00

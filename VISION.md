@@ -1,5 +1,5 @@
 ---
-last-reconciled: 2026-03-18
+last-reconciled: 2026-03-20
 status: CURRENT
 ---
 
@@ -43,11 +43,20 @@ Lateral agent coordination via SQLite-backed message board with channels (resear
 
 ### 7. **Mission Control Integration** -- PARTIAL
 
-HYDRA pushes heartbeat and observation signals to Mission Control's signals store. Morning planner reads MC signals for context. Missing: Bi-directional Telegram bridge, MC-driven priority suggestions, centralized signal routing through MC as single source of truth.
+**Shipped:** HYDRA pushes heartbeat and observation signals to MC's signals store (brain-updater, evening-review). Morning planner reads MC signals as Haiku context for daily priority suggestions. Shared repos.sh config with MC slug mapping. Signal TTL and auto-purge.
 
-### 8. **Open Source Release** -- UNREALIZED
+**Not yet implemented:**
+- Bi-directional Telegram bridge: MC sending commands/alerts back to Eddie through HYDRA's Telegram bot (currently HYDRA pushes to MC but MC cannot push back through Telegram).
+- MC-driven priority suggestions: MC autonomously surfacing priorities to HYDRA based on cross-product signal analysis (currently HYDRA reads raw signals; MC doesn't generate derived suggestions).
+- Centralized signal routing: All HYDRA signals flowing through MC as single source of truth rather than HYDRA maintaining parallel state in SQLite (currently both systems maintain independent state).
 
-Clean up scripts, write README, redact secrets, publish at github.com/eddiebelaval/hydra. Missing: Documentation, example configs, secret redaction pass, installation guide.
+### 8. **Open Source Release** -- PARTIAL
+
+**Shipped:** .gitignore excludes all secrets (config/*.env, hydra.db, state/, logs/). Example telegram.env.example with setup instructions. Example agents.yaml with full agent config documentation. init-db.sql with complete schema.
+
+**Not yet implemented:**
+- README.md with installation guide and architecture overview.
+- Contribution guidelines and license.
 
 ## Phased Vision
 

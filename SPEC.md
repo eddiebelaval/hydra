@@ -1,5 +1,5 @@
 ---
-last-reconciled: 2026-03-18
+last-reconciled: 2026-03-20
 status: CURRENT
 ---
 
@@ -94,6 +94,7 @@ Three files to add a capability:
 | Observational memory | 15-min observer + daily reflector | Haiku + Sonnet |
 | Wellness enforcement | Event-driven morning, clock-driven day | Pure bash |
 | Agent board | 6 channels, threading | SQLite-backed |
-| MC integration | Heartbeat + observation signals | Via mc CLI |
+| MC integration (push) | Heartbeat + observation signals | Via mc CLI, repos.sh shared config |
+| MC integration (read) | Morning planner reads MC signals | Haiku context for priority suggestions |
 | Memory guard | 60s vm_stat monitoring | Auto-kill on pressure |
 | Health monitoring | 30-min heartbeat, 5 checks | SQLite + alerts |

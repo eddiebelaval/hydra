@@ -2,7 +2,7 @@
 
 *The build log for HYDRA. What shipped, why it was built, and what we learned.*
 
-Last updated: 2026-03-18
+Last updated: 2026-03-20
 
 ---
 
@@ -139,3 +139,23 @@ MC is central command. Everything flows through it. HYDRA's reports were disconn
 - **Three-field format over case statement:** Co-locates slug mapping with repo definition. Adding a repo is one line in one file.
 - **Commit cache via temp dir:** Brain-updater and evening-review cache commit data during the first scan, reuse for MC signal push. Eliminates 12 redundant git log calls per run.
 - **Push over pull for MC:** HYDRA pushes signals to MC rather than MC polling HYDRA. Simpler, works with MC's existing signals store.
+
+---
+
+## Heal: Documentation + State Clarification (Mar 20, 2026)
+
+### What shipped
+- **README.md:** Full installation guide covering secrets, database init, repo config, agent config, launchd setup, and testing. Architecture diagram, daily automation flow table, directory structure reference, security notes, and cost breakdown.
+- **agents.yaml.example:** Annotated example agent config with inline documentation for all fields, task routing rules, and cost limits.
+- **SPEC.md:** MC integration capability row split into push and read to accurately reflect what's built. Added repos.sh shared config note.
+- **VISION.md:** MC Integration pillar (Pillar 7) expanded with explicit shipped/not-yet-implemented breakdown for the three missing pieces (bi-directional Telegram bridge, MC-driven priority suggestions, centralized signal routing). Open Source Release pillar (Pillar 8) updated from UNREALIZED to PARTIAL now that docs and example configs exist.
+- **Secret redaction verified:** All API keys live in gitignored `config/*.env` files. No secrets found in tracked files. telegram.env.example uses placeholder values.
+
+### Why
+Two blockers identified: (1) MC Integration documented as PARTIAL but the gap between shipped and missing wasn't specific enough to plan next steps. (2) Open Source Release blocked by missing documentation. This heal session addresses the documentation gap directly and clarifies the MC Integration gap so the next session can target a specific slice.
+
+### What's still needed for MC Integration
+The three missing pieces are independent features, each requiring work on both the HYDRA and Mission Control sides:
+1. **Bi-directional Telegram bridge:** MC needs an endpoint or webhook that triggers HYDRA's Telegram bot to send messages. HYDRA needs a handler for MC-originated alerts.
+2. **MC-driven priority suggestions:** MC needs a derived-signals engine that analyzes cross-product patterns and generates priority recommendations. HYDRA's morning planner would read these instead of (or in addition to) raw signals.
+3. **Centralized signal routing:** Requires MC to become the canonical state store, with HYDRA reading from MC rather than maintaining parallel SQLite state for observations and health data.
