@@ -167,6 +167,33 @@ def cmd_resolve(args, conn=None):
             conn.close()
 
 
+def cmd_tree(args, conn=None):
+    """Show delegation tree for a job."""
+    _owns_conn = conn is None
+    if _owns_conn:
+        conn = connect()
+
+    try:
+        def print_tree(job_id, depth=0):
+            job = conn.execute("SELECT * FROM rt_jobs WHERE id = ?", (job_id,)).fetchone()
+            if not job:
+                return
+            indent = "  " * depth
+            marker = "+" if depth > 0 else "*"
+            print(f"{indent}{marker} [{job['status']:>9}] {job['id'][:8]}... {job['agent_id']:>6} | {job['title']}")
+            children = conn.execute(
+                "SELECT id FROM rt_jobs WHERE parent_job_id = ? ORDER BY created_at",
+                (job_id,)
+            ).fetchall()
+            for child in children:
+                print_tree(child['id'], depth + 1)
+
+        print_tree(args.job_id)
+    finally:
+        if _owns_conn:
+            conn.close()
+
+
 def cmd_list(args, conn=None):
     """List jobs, optionally filtered by status and/or agent."""
     _owns_conn = conn is None
@@ -242,6 +269,10 @@ def build_parser():
     p_list.add_argument('--status', default=None, help='Filter by status')
     p_list.add_argument('--agent', default=None, help='Filter by agent ID')
 
+    # tree
+    p_tree = sub.add_parser('tree', help='Show delegation tree for a job')
+    p_tree.add_argument('job_id', help='Root job ID to display')
+
     return parser
 
 
@@ -255,6 +286,7 @@ def main():
         'deps': cmd_deps,
         'resolve': cmd_resolve,
         'list': cmd_list,
+        'tree': cmd_tree,
     }
     dispatch[args.command](args)
 

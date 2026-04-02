@@ -242,5 +242,85 @@ class TestResolveCommand(unittest.TestCase):
         self.assertEqual(row['status'], 'resolved')
 
 
+class TestTreeCommand(unittest.TestCase):
+    def setUp(self):
+        self.db_path, self.conn = create_test_db()
+
+    def tearDown(self):
+        self.conn.close()
+        os.unlink(self.db_path)
+
+    def test_tree_shows_delegation_hierarchy(self):
+        """cmd_tree output contains all jobs in a 3-level delegation hierarchy."""
+        import argparse
+        import io
+        from rt_cli import cmd_create, cmd_tree
+        from rt_db import generate_id
+
+        # Insert agents for FK satisfaction
+        for agent in ["milo", "forge", "scout"]:
+            self.conn.execute(
+                "INSERT OR IGNORE INTO agents (id, name, role, session_key, model) "
+                "VALUES (?, ?, 'dev', 'test-session', 'anthropic/claude-sonnet-4')",
+                (agent, agent.capitalize()),
+            )
+        self.conn.commit()
+
+        # Create root job (milo)
+        args_root = argparse.Namespace(
+            agent='milo', title='Root task', payload=None, priority=0, depends_on=None,
+        )
+        cmd_create(args_root, conn=self.conn)
+        root = self.conn.execute("SELECT id FROM rt_jobs WHERE title = 'Root task'").fetchone()
+        root_id = root['id']
+
+        # Create child 1 (forge) with parent_job_id = root_id
+        child1_id = generate_id()
+        self.conn.execute(
+            "INSERT INTO rt_jobs (id, parent_job_id, agent_id, status, title) "
+            "VALUES (?, ?, 'forge', 'ready', 'Child forge task')",
+            (child1_id, root_id),
+        )
+
+        # Create child 2 (scout) with parent_job_id = root_id
+        child2_id = generate_id()
+        self.conn.execute(
+            "INSERT INTO rt_jobs (id, parent_job_id, agent_id, status, title) "
+            "VALUES (?, ?, 'scout', 'ready', 'Child scout task')",
+            (child2_id, root_id),
+        )
+
+        # Create grandchild (milo) with parent_job_id = child1_id
+        grandchild_id = generate_id()
+        self.conn.execute(
+            "INSERT INTO rt_jobs (id, parent_job_id, agent_id, status, title) "
+            "VALUES (?, ?, 'milo', 'ready', 'Grandchild milo task')",
+            (grandchild_id, child1_id),
+        )
+        self.conn.commit()
+
+        # Capture output of cmd_tree
+        args_tree = argparse.Namespace(job_id=root_id)
+        captured = io.StringIO()
+        old_stdout = sys.stdout
+        sys.stdout = captured
+        try:
+            cmd_tree(args_tree, conn=self.conn)
+        finally:
+            sys.stdout = old_stdout
+
+        output = captured.getvalue()
+
+        # All 4 jobs should appear
+        self.assertIn('Root task', output)
+        self.assertIn('Child forge task', output)
+        self.assertIn('Child scout task', output)
+        self.assertIn('Grandchild milo task', output)
+
+        # Root uses '*' marker, children use '+'
+        self.assertIn('*', output)
+        self.assertIn('+', output)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
