@@ -79,6 +79,24 @@ log "Heartbeat: every ${HEARTBEAT_MIN} minutes"
 sqlite3 "$HYDRA_DB" "UPDATE agents SET last_heartbeat_at = datetime('now') WHERE id = '$AGENT_ID';" 2>/dev/null
 
 # ============================================================================
+# CHECK RUNTIME ENGINE WORK
+# ============================================================================
+
+log "Checking runtime engine..."
+
+RT_RESULT=$(/usr/bin/python3 "$HOME/.hydra/runtime/claim_and_execute.py" "$AGENT_ID" 2>&1)
+RT_EXIT=$?
+
+if [[ $RT_EXIT -eq 0 && -n "$RT_RESULT" ]]; then
+    log "Runtime engine: $RT_RESULT"
+    log_activity "rt_job_executed" "$RT_RESULT"
+elif [[ $RT_EXIT -eq 2 ]]; then
+    log "Runtime engine: no pending work"
+else
+    log "Runtime engine error (exit=$RT_EXIT): $RT_RESULT"
+fi
+
+# ============================================================================
 # CHECK NOTIFICATIONS
 # ============================================================================
 
