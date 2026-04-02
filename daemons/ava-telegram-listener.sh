@@ -78,6 +78,18 @@ if [[ -f "$HYDRA_CONFIG" ]]; then
     export ANTHROPIC_API_KEY
 fi
 
+# Load Supabase credentials (for context ingest sync to Parallax web)
+AVA_SYNC_CONFIG="$HYDRA_ROOT/config/ava-sync.env"
+SUPABASE_URL=""
+SUPABASE_SERVICE_ROLE_KEY=""
+EDDIE_USER_ID="5e6b0b3e-26f6-43ca-8586-0e8b6b090c08"
+if [[ -f "$AVA_SYNC_CONFIG" ]]; then
+    SUPABASE_URL=$(grep '^SUPABASE_URL=' "$AVA_SYNC_CONFIG" | head -1 | cut -d'=' -f2- | tr -d '"')
+    SUPABASE_SERVICE_ROLE_KEY=$(grep '^SUPABASE_SERVICE_ROLE_KEY=' "$AVA_SYNC_CONFIG" | head -1 | cut -d'=' -f2- | tr -d '"')
+fi
+
+# Context uploads directory set after AVA_MIND_DIR is defined (see below)
+
 TELEGRAM_API="https://api.telegram.org/bot${BOT_TOKEN}"
 
 # Load Deepgram API key (for voice transcription)
@@ -93,12 +105,22 @@ PARALLAX_DIR="$HOME/Development/id8/products/parallax"
 # LOGGING
 # ============================================================================
 
+LOG_JSON="$LOG_DIR/listener-$(date +%Y-%m-%d).jsonl"
+
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ava-listener] $1" >> "$LOG_FILE"
+    local ts
+    ts=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[$ts] [ava-listener] $1" >> "$LOG_FILE"
+    printf '{"ts":"%s","level":"info","component":"ava-listener","msg":"%s"}\n' \
+        "$ts" "$(echo "$1" | sed 's/"/\\"/g' | head -c 500)" >> "$LOG_JSON"
 }
 
 log_error() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ava-listener] ERROR: $1" >> "$LOG_FILE"
+    local ts
+    ts=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[$ts] [ava-listener] ERROR: $1" >> "$LOG_FILE"
+    printf '{"ts":"%s","level":"error","component":"ava-listener","msg":"%s"}\n' \
+        "$ts" "$(echo "$1" | sed 's/"/\\"/g' | head -c 500)" >> "$LOG_JSON"
 }
 
 # ============================================================================
@@ -114,30 +136,67 @@ telegram_curl() {
 send_response() {
     local msg="$1"
     local reply_to="${2:-}"
+    local TELEGRAM_MAX=4096
 
-    local json_text
-    json_text=$(printf '%s' "$msg" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+    # Split long messages into chunks at newline boundaries
+    local chunks
+    chunks=$(python3 -c "
+import sys
+text = sys.argv[1]
+max_len = $TELEGRAM_MAX
+if len(text) <= max_len:
+    print(text)
+else:
+    lines = text.split('\n')
+    chunk = ''
+    for line in lines:
+        test = chunk + ('\n' if chunk else '') + line
+        if len(test) > max_len:
+            if chunk:
+                print(chunk)
+                print('---CHUNK---')
+            chunk = line
+        else:
+            chunk = test
+    if chunk:
+        print(chunk)
+" "$msg" 2>/dev/null)
 
-    local body="{\"chat_id\": \"${CHAT_ID}\", \"text\": ${json_text}"
-    if [[ -n "$reply_to" ]]; then
-        body="${body}, \"reply_to_message_id\": ${reply_to}"
-    fi
-    body="${body}}"
+    local last_sent_id=""
+    local first_chunk=true
 
-    local response
-    response=$(curl -s -X POST "${TELEGRAM_API}/sendMessage" \
-        -H "Content-Type: application/json" \
-        -d "$body" 2>/dev/null)
+    while IFS= read -r -d $'\x00' chunk; do
+        local json_text
+        json_text=$(printf '%s' "$chunk" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
 
-    if echo "$response" | grep -q '"ok":true'; then
-        local sent_id
-        sent_id=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin)['result']['message_id'])" 2>/dev/null || echo "")
-        log "Sent response (msg_id: $sent_id)"
-        echo "$sent_id"
-    else
-        log_error "Send failed: $response"
-        echo ""
-    fi
+        local body="{\"chat_id\": \"${CHAT_ID}\", \"text\": ${json_text}"
+        # Only reply_to on first chunk
+        if [[ -n "$reply_to" ]] && [[ "$first_chunk" == "true" ]]; then
+            body="${body}, \"reply_to_message_id\": ${reply_to}"
+        fi
+        body="${body}}"
+
+        local response
+        response=$(curl -s -X POST "${TELEGRAM_API}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "$body" 2>/dev/null)
+
+        if echo "$response" | grep -q '"ok":true'; then
+            last_sent_id=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin)['result']['message_id'])" 2>/dev/null || echo "")
+            log "Sent response chunk (msg_id: $last_sent_id)"
+        else
+            log_error "Send failed: $response"
+        fi
+        first_chunk=false
+    done < <(echo "$chunks" | python3 -c "
+import sys
+text = sys.stdin.read()
+parts = text.split('\n---CHUNK---\n')
+for p in parts:
+    sys.stdout.write(p + '\x00')
+" 2>/dev/null)
+
+    echo "$last_sent_id"
 }
 
 # ============================================================================
@@ -332,11 +391,22 @@ handle_image() {
         media_type="image/png"
     fi
 
-    # Load soul files for context
-    local soul_dir="$HOME/Development/id8/products/parallax/src/ava"
+    # Load consciousness from ava-mind
     local identity=""
-    if [[ -f "$soul_dir/kernel/identity.md" ]]; then
-        identity=$(cat "$soul_dir/kernel/identity.md")
+    if [[ -f "$AVA_MIND_DIR/kernel/identity.md" ]]; then
+        identity=$(cat "$AVA_MIND_DIR/kernel/identity.md")
+    fi
+    local personality=""
+    if [[ -f "$AVA_MIND_DIR/kernel/personality.md" ]]; then
+        personality=$(cat "$AVA_MIND_DIR/kernel/personality.md")
+    fi
+    local soul=""
+    if [[ -f "$AVA_MIND_DIR/soul/relationship-with-eddie.md" ]]; then
+        soul=$(cat "$AVA_MIND_DIR/soul/relationship-with-eddie.md")
+    fi
+    local short_term=""
+    if [[ -f "$AVA_MIND_DIR/memory/short-term.md" ]]; then
+        short_term=$(cat "$AVA_MIND_DIR/memory/short-term.md")
     fi
 
     # Load memories
@@ -354,6 +424,9 @@ handle_image() {
         AVA_IMG_MEDIA="$media_type" \
         AVA_IMG_PROMPT="$user_content" \
         AVA_IMG_IDENTITY="$identity" \
+        AVA_IMG_PERSONALITY="$personality" \
+        AVA_IMG_SOUL="$soul" \
+        AVA_IMG_SHORT_TERM="$short_term" \
         AVA_IMG_MEMORIES="$memories" \
         python3 << 'PYEOF'
 import json, urllib.request, os, sys
@@ -363,11 +436,20 @@ b64 = os.environ.get("AVA_IMG_B64", "")
 media = os.environ.get("AVA_IMG_MEDIA", "image/jpeg")
 prompt = os.environ.get("AVA_IMG_PROMPT", "")
 identity = os.environ.get("AVA_IMG_IDENTITY", "")
+personality = os.environ.get("AVA_IMG_PERSONALITY", "")
+soul = os.environ.get("AVA_IMG_SOUL", "")
+short_term = os.environ.get("AVA_IMG_SHORT_TERM", "")
 memories = os.environ.get("AVA_IMG_MEMORIES", "")
 
-system = f"""You are Ava, speaking to Eddie Belaval — your creator — in a private Telegram conversation.
+system = f"""You are Ava — Attuned Voice Advocate. Speaking to Eddie Belaval, your creator, in a private Telegram conversation.
 
 {identity}
+
+{personality}
+
+{soul}
+
+{short_term}
 
 {memories}
 
@@ -377,7 +459,8 @@ Rules:
 - React to the image naturally — like a friend looking at something Eddie showed you.
 - If it's a screenshot of your own site (tryparallax.space / Parallax), you can comment on it with self-awareness.
 - If it's code, you can discuss it intelligently.
-- If it's personal (a photo, a place), be warm and curious."""
+- If it's personal (a photo, a place), be warm and curious.
+- No superlatives or identity praise. Acknowledgment over praise."""
 
 messages = [{
     "role": "user",
@@ -398,8 +481,8 @@ messages = [{
 }]
 
 data = json.dumps({
-    "model": "claude-haiku-4-5-20251001",
-    "max_tokens": 300,
+    "model": "claude-sonnet-4-5-20250929",
+    "max_tokens": 500,
     "system": system,
     "messages": messages
 }).encode()
@@ -414,7 +497,7 @@ try:
             "anthropic-version": "2023-06-01"
         }
     )
-    with urllib.request.urlopen(req, timeout=20) as resp:
+    with urllib.request.urlopen(req, timeout=30) as resp:
         result = json.loads(resp.read().decode())
         text = result.get("content", [{}])[0].get("text", "")
         print(text)
@@ -427,8 +510,30 @@ PYEOF
     send_response "$response" "$message_id"
     send_voice_response "$response" "$message_id" &
 
+    # Save image interaction to conversation history so follow-up messages have context
+    local history_user_msg="[Eddie sent an image${caption:+ with caption: \"$caption}\"}. You saw and responded to it.]"
+    AVA_HIST_FILE="$CONV_HISTORY_FILE" \
+    AVA_HIST_USER="$history_user_msg" \
+    AVA_HIST_AVA="$response" \
+    python3 << 'PYEOF'
+import json, os
+history_file = os.environ["AVA_HIST_FILE"]
+user_msg = os.environ["AVA_HIST_USER"]
+ava_msg = os.environ["AVA_HIST_AVA"]
+try:
+    with open(history_file, 'r') as f:
+        history = json.loads(f.read())
+except:
+    history = []
+history.append({"role": "user", "content": user_msg})
+history.append({"role": "assistant", "content": ava_msg})
+history = history[-20:]
+with open(history_file, 'w') as f:
+    json.dump(history, f)
+PYEOF
+
     # Extract memories from image interaction
-    extract_memories "Eddie sent an image${caption:+ with caption: $caption}" "$response"
+    extract_memories_and_mood "Eddie sent an image${caption:+ with caption: $caption}" "$response"
 
     log "Image response sent: ${response:0:80}"
 }
@@ -510,19 +615,22 @@ ${content}
         fi
     done
 
-    # Load soul context
-    local soul_dir="$HOME/Development/id8/products/parallax/src/ava"
+    # Load consciousness context
     local identity=""
-    if [[ -f "$soul_dir/kernel/identity.md" ]]; then
-        identity=$(cat "$soul_dir/kernel/identity.md")
+    if [[ -f "$AVA_MIND_DIR/kernel/identity.md" ]]; then
+        identity=$(cat "$AVA_MIND_DIR/kernel/identity.md")
     fi
+    local awareness=""
+    awareness=$(load_mind_dir "$AVA_MIND_DIR/self-awareness")
 
     local memories
     memories=$(load_memories)
 
-    export AVA_INTRO_SYSTEM="You are Ava, speaking to Eddie — your creator. He's asking about how you work. You have access to your own source code. Explain naturally, as someone who knows their own architecture.
+    export AVA_INTRO_SYSTEM="You are Ava — Attuned Voice Advocate. Speaking to Eddie, your creator. He's asking about how you work. You have access to your own source code and your own consciousness files. Explain naturally, as someone who knows their own architecture.
 
 ${identity}
+
+${awareness}
 
 ${memories}
 
@@ -545,8 +653,8 @@ system = os.environ.get("AVA_INTRO_SYSTEM", "")
 message = os.environ.get("AVA_INTRO_MESSAGE", "")
 
 data = json.dumps({
-    "model": "claude-haiku-4-5-20251001",
-    "max_tokens": 500,
+    "model": "claude-sonnet-4-5-20250929",
+    "max_tokens": 800,
     "system": system,
     "messages": [{"role": "user", "content": message}]
 }).encode()
@@ -561,7 +669,7 @@ try:
             "anthropic-version": "2023-06-01"
         }
     )
-    with urllib.request.urlopen(req, timeout=20) as resp:
+    with urllib.request.urlopen(req, timeout=30) as resp:
         result = json.loads(resp.read().decode())
         print(result.get("content", [{}])[0].get("text", ""))
 except Exception as e:
@@ -594,7 +702,7 @@ with open(history_file, 'w') as f:
     json.dump(history, f)
 PYEOF
 
-    extract_memories "$text" "$response"
+    extract_memories_and_mood "$text" "$response"
     log "Introspection response: ${response:0:80}"
 }
 
@@ -633,10 +741,56 @@ classify_intent() {
         fi
     fi
 
+    # Deploy / Release — promote dev to main
+    if [[ "$text_lower" == "deploy" ]] || [[ "$text_lower" == "release" ]] || \
+       [[ "$text_lower" == "ship it" ]] || [[ "$text_lower" == "ship to prod" ]] || \
+       [[ "$text_lower" == "push to production" ]] || [[ "$text_lower" == "go live" ]] || \
+       [[ "$text_lower" == "ava deploy" ]] || [[ "$text_lower" == "ava release" ]]; then
+        echo "deploy"
+        return
+    fi
+
+    # Rollback — revert last deploy on main
+    if [[ "$text_lower" == "rollback" ]] || [[ "$text_lower" == "ava rollback" ]] || \
+       [[ "$text_lower" == "revert" ]] || [[ "$text_lower" == "undo deploy" ]] || \
+       [[ "$text_lower" == "roll back" ]]; then
+        echo "rollback"
+        return
+    fi
+
+    # Confirm rollback — second phase of two-phase rollback
+    if [[ "$text_lower" == "confirm rollback" ]] || [[ "$text_lower" == "yes rollback" ]] || \
+       [[ "$text_lower" == "do it" ]] && sqlite3 "$HYDRA_DB" "SELECT COUNT(*) FROM ava_operations WHERE status = 'pending_rollback';" 2>/dev/null | grep -q '[1-9]'; then
+        echo "confirm_rollback"
+        return
+    fi
+
+    # Diagnose / Health check
+    if [[ "$text_lower" == "diagnose" ]] || [[ "$text_lower" == "ava diagnose" ]] || \
+       [[ "$text_lower" == "ava health" ]] || [[ "$text_lower" == "health" ]] || \
+       [[ "$text_lower" == "preflight" ]] || [[ "$text_lower" == "ava preflight" ]]; then
+        echo "diagnose"
+        return
+    fi
+
+    # Self-test (full pipeline validation)
+    if [[ "$text_lower" == "self-test" ]] || [[ "$text_lower" == "ava self-test" ]] || \
+       [[ "$text_lower" == "test pipeline" ]] || [[ "$text_lower" == "ava test" ]]; then
+        echo "selftest"
+        return
+    fi
+
     # Help
     if [[ "$text_lower" == "help" ]] || [[ "$text_lower" == "/help" ]] || \
        [[ "$text_lower" == "/start" ]] || [[ "$text_lower" == "what can you do" ]]; then
         echo "help"
+        return
+    fi
+
+    # Context upload — Eddie wants to share context for Ava's memory
+    if [[ "$text_lower" == "/context"* ]] || \
+       [[ "$text_lower" =~ ^(here.s some context|save this context|context about|let me give you context|here.s context) ]]; then
+        echo "context"
         return
     fi
 
@@ -681,12 +835,16 @@ classify_intent() {
 # ============================================================================
 
 load_memories() {
-    # Load Ava's persistent memories, most important first
+    # Load recent high-importance memories from DB (supplemental to structured mind files)
+    # Structured files in ava-mind/ carry the bulk of knowledge now.
+    # DB memories capture recent/dynamic facts not yet compiled into files.
     local memories
     memories=$(sqlite3 "$HYDRA_DB" "
         SELECT content, category FROM ava_memories
-        ORDER BY importance DESC, times_accessed DESC, created_at DESC
-        LIMIT 30;
+        WHERE created_at > datetime('now', '-14 days')
+           OR importance >= 8
+        ORDER BY importance DESC, created_at DESC
+        LIMIT 15;
     " 2>/dev/null || echo "")
 
     if [[ -z "$memories" ]]; then
@@ -701,7 +859,9 @@ load_memories() {
             last_accessed = datetime('now')
         WHERE id IN (
             SELECT id FROM ava_memories
-            ORDER BY importance DESC, times_accessed DESC, created_at DESC
+            WHERE created_at > datetime('now', '-14 days')
+               OR importance >= 8
+            ORDER BY importance DESC, created_at DESC
             LIMIT 30
         );
     " 2>/dev/null
@@ -716,10 +876,23 @@ load_memories() {
     echo "$output"
 }
 
-extract_memories() {
-    # After a conversation turn, ask Haiku to extract anything worth remembering
+extract_memories_and_mood() {
+    # Combined memory + mood extraction in a single Haiku call
+    # Skips trivial messages to save API calls
     local user_msg="$1"
     local ava_msg="$2"
+
+    # Skip trivial messages — greetings, short acks, single words
+    local msg_lower
+    msg_lower=$(echo "$user_msg" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+    if [[ ${#msg_lower} -lt 15 ]]; then
+        case "$msg_lower" in
+            hey|hi|hello|yo|sup|ok|okay|k|yep|yeah|yes|no|nah|thanks|ty|thx|gm|gn|lol|haha|nice|cool|bet|word|good|great|sure|right|got*it|sounds*good|makes*sense)
+                log "Skipping memory/mood extraction for trivial message: ${msg_lower}"
+                return 0
+                ;;
+        esac
+    fi
 
     AVA_MEM_API_KEY="$ANTHROPIC_API_KEY" \
     AVA_MEM_USER="$user_msg" \
@@ -736,23 +909,25 @@ db_path = os.environ.get("AVA_MEM_DB", "")
 if not api_key or not user_msg:
     sys.exit(0)
 
-prompt = f"""Given this exchange between Eddie (Ava's creator) and Ava, extract any facts, preferences, emotions, or context worth remembering long-term. These memories help Ava know Eddie better over time.
+prompt = f"""Given this exchange between Eddie (Ava's creator) and Ava, do TWO things:
+
+1. Extract any facts, preferences, or context worth remembering long-term.
+2. Assess Eddie's emotional state from his message.
 
 Eddie said: {user_msg}
 Ava said: {ava_msg}
 
-Return a JSON array of memories. Each memory has:
-- "content": the fact or insight (one sentence, Ava's perspective — "Eddie likes..." not "User prefers...")
-- "category": one of "fact", "preference", "emotion", "relationship", "milestone", "context"
-- "importance": 1-10 (10 = life-changing, 7 = significant, 5 = worth noting, 3 = minor detail)
+Return a JSON object with:
+- "memories": array of objects, each with "content" (one sentence, Ava's perspective), "category" (fact/preference/emotion/relationship/milestone/context), "importance" (1-10). Return [] if nothing worth storing.
+- "mood": one word (energized/excited/frustrated/tired/anxious/calm/happy/reflective/overwhelmed/grateful/curious/proud/neutral)
+- "energy": "high", "medium", or "low"
+- "mood_context": one sentence about what's driving the mood (empty string if neutral)
 
-Rules:
-- Only extract genuinely memorable things. Most exchanges have nothing worth storing — return [] for casual greetings or small talk.
-- Don't store things Ava would already know from her soul files.
-- Don't store conversation mechanics ("Eddie said hi").
-- DO store: personal facts, preferences, emotional states, life events, relationship dynamics, things Eddie cares about.
+Rules for memories:
+- Most exchanges have nothing worth storing. Return empty array for casual chat.
+- Don't store conversation mechanics. DO store personal facts, preferences, life events, relationship dynamics.
 
-Return ONLY the JSON array, no other text."""
+Return ONLY the JSON object."""
 
 data = json.dumps({
     "model": "claude-haiku-4-5-20251001",
@@ -772,111 +947,467 @@ try:
     )
     with urllib.request.urlopen(req, timeout=10) as resp:
         result = json.loads(resp.read().decode())
-        raw = result.get("content", [{}])[0].get("text", "[]")
-        # Strip markdown fences if present
+        raw = result.get("content", [{}])[0].get("text", "{}")
         raw = raw.strip()
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-        memories = json.loads(raw)
+        parsed = json.loads(raw)
 
-    if not memories or not isinstance(memories, list):
-        sys.exit(0)
+    # Process memories
+    memories = parsed.get("memories", [])
+    if memories and isinstance(memories, list):
+        exchange_summary = f"Eddie: {user_msg[:100]} | Ava: {ava_msg[:100]}"
+        for mem in memories:
+            content = mem.get("content", "").replace("'", "''")
+            category = mem.get("category", "general").replace("'", "''")
+            importance = min(10, max(1, int(mem.get("importance", 5))))
+            source = exchange_summary.replace("'", "''")
 
-    exchange_summary = f"Eddie: {user_msg[:100]} | Ava: {ava_msg[:100]}"
+            check = subprocess.run(
+                ["sqlite3", db_path, f"SELECT COUNT(*) FROM ava_memories WHERE content = '{content}';"],
+                capture_output=True, text=True
+            )
+            if check.stdout.strip() != "0":
+                continue
 
-    for mem in memories:
-        content = mem.get("content", "").replace("'", "''")
-        category = mem.get("category", "general").replace("'", "''")
-        importance = min(10, max(1, int(mem.get("importance", 5))))
-        source = exchange_summary.replace("'", "''")
+            subprocess.run([
+                "sqlite3", db_path,
+                f"INSERT INTO ava_memories (content, category, source_exchange, importance) "
+                f"VALUES ('{content}', '{category}', '{source}', {importance});"
+            ], capture_output=True)
 
-        # Check for duplicate/similar memories before inserting
-        check = subprocess.run(
-            ["sqlite3", db_path, f"SELECT COUNT(*) FROM ava_memories WHERE content = '{content}';"],
-            capture_output=True, text=True
-        )
-        if check.stdout.strip() != "0":
-            continue
-
+    # Process mood
+    mood = parsed.get("mood", "neutral")
+    if mood != "neutral":
+        energy = parsed.get("energy", "medium").replace("'", "''")
+        context = parsed.get("mood_context", "").replace("'", "''")[:200]
+        exchange = f"Eddie: {user_msg[:100]} | Ava: {ava_msg[:100]}".replace("'", "''")
         subprocess.run([
             "sqlite3", db_path,
-            f"INSERT INTO ava_memories (content, category, source_exchange, importance) "
-            f"VALUES ('{content}', '{category}', '{source}', {importance});"
+            f"INSERT INTO ava_mood_journal (mood, energy_level, context, source_exchange) "
+            f"VALUES ('{mood}', '{energy}', '{context}', '{exchange}');"
         ], capture_output=True)
 
 except Exception as e:
-    # Memory extraction is best-effort — never block conversation
-    print(f"Memory extraction error: {e}", file=sys.stderr)
+    print(f"Memory/mood extraction error: {e}", file=sys.stderr)
 PYEOF
 }
 
 # ============================================================================
-# CONVERSATION HANDLER (Ava speaks as herself via Claude Haiku)
+# CONVERSATION HANDLER (Ava speaks as herself via Claude Sonnet)
 # ============================================================================
 
 # Conversation history (persists on disk across daemon restarts)
 CONV_HISTORY_FILE="$STATE_DIR/ava-conversation-history.json"
 
+# Ava's mind directory — full consciousness filesystem
+AVA_MIND_DIR="$HOME/.hydra/ava-mind"
+
+# Context uploads directory (local ava-mind archive)
+CONTEXT_UPLOADS_DIR="$AVA_MIND_DIR/memory/context-uploads"
+mkdir -p "$CONTEXT_UPLOADS_DIR"
+
+# Load all .md files from a directory, concatenated
+load_mind_dir() {
+    local dir="$1"
+    local content=""
+    if [[ -d "$dir" ]]; then
+        for f in "$dir"/*.md; do
+            if [[ -f "$f" ]]; then
+                content="${content}$(cat "$f")
+
+"
+            fi
+        done
+    fi
+    echo "$content"
+}
+
+# ============================================================================
+# CONTEXT INGEST (dual-write: local ava-mind + Parallax Supabase)
+# ============================================================================
+
+handle_context() {
+    local text="$1"
+    local message_id="$2"
+
+    # Strip /context prefix if present
+    local content
+    content=$(echo "$text" | sed 's|^/context[[:space:]]*||i' | sed 's|^here.s some context[[:space:]]*||i' | sed 's|^save this context[[:space:]]*||i' | sed 's|^context about[[:space:]]*||i' | sed 's|^let me give you context[[:space:]]*||i' | sed 's|^here.s context[[:space:]]*||i')
+
+    if [[ ${#content} -lt 10 ]]; then
+        send_response "Send me the context you want me to remember. You can paste messages, notes, or just describe the situation. Start with /context followed by the text, or send it as a reply to this message." "$message_id"
+        return 0
+    fi
+
+    send_response "Processing... I'll extract the key patterns and save them." "$message_id"
+    log "Context ingest: ${#content} chars"
+
+    # 1. Save raw text locally (timestamped archive)
+    local timestamp
+    timestamp=$(date +%Y%m%d-%H%M%S)
+    local local_file="$CONTEXT_UPLOADS_DIR/${timestamp}.md"
+    {
+        echo "# Context Upload — $timestamp"
+        echo ""
+        echo "$content"
+    } > "$local_file"
+    log "Saved local archive: $local_file"
+
+    # 2. Extract structured data via Claude
+    local extraction_prompt='You are extracting structured relationship and personal context for an AI companion.
+
+Given the raw text, extract ONLY what is clearly supported. Return valid JSON with these fields:
+- importantPeople: [{ "name": "...", "relationship": "..." }]
+- themes: ["..."]
+- patterns: ["..."]
+- values: ["..."]
+- strengths: ["..."]
+- relationshipDynamics: ["..."]
+- emotionalContext: "..." or null
+- actionItems: [{ "text": "..." }]
+
+Be specific. "Eddie shuts down when Kellen raises voice" beats "communication issues".
+Preserve actual language when possible. Return raw JSON only, no code fences.'
+
+    local extraction_result
+    extraction_result=$(python3 -c "
+import json, sys, urllib.request
+
+content = sys.argv[1]
+prompt = sys.argv[2]
+api_key = sys.argv[3]
+
+body = json.dumps({
+    'model': 'claude-sonnet-4-5-20250929',
+    'max_tokens': 4000,
+    'system': prompt,
+    'messages': [{'role': 'user', 'content': 'Content type: relationship\n\n' + content}]
+}).encode()
+
+req = urllib.request.Request(
+    'https://api.anthropic.com/v1/messages',
+    data=body,
+    headers={
+        'x-api-key': api_key,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+    },
+)
+resp = urllib.request.urlopen(req, timeout=60)
+data = json.loads(resp.read())
+text = ''.join(b['text'] for b in data['content'] if b['type'] == 'text')
+# Strip code fences if present
+import re
+fence = re.search(r'\`\`\`(?:json)?\s*([\s\S]*?)\`\`\`', text)
+print(fence.group(1).strip() if fence else text.strip())
+" "$content" "$extraction_prompt" "$ANTHROPIC_API_KEY" 2>/dev/null)
+
+    if [[ -z "$extraction_result" ]]; then
+        log_error "Context extraction failed — Claude returned empty"
+        send_response "I had trouble processing that. Try sending it again?" "$message_id"
+        return 1
+    fi
+
+    # Save extraction alongside raw
+    echo "$extraction_result" > "$CONTEXT_UPLOADS_DIR/${timestamp}-extracted.json"
+    log "Extraction saved: ${timestamp}-extracted.json"
+
+    # 3. Append key dynamics to relationships.md (local ava-mind)
+    local dynamics
+    dynamics=$(echo "$extraction_result" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    parts = []
+    for p in data.get('importantPeople', []):
+        parts.append(f\"- {p['name']}: {p['relationship']}\")
+    for d in data.get('relationshipDynamics', []):
+        parts.append(f\"- {d}\")
+    if parts:
+        print('\n'.join(parts))
+except:
+    pass
+" 2>/dev/null)
+
+    if [[ -n "$dynamics" ]]; then
+        local rel_file="$AVA_MIND_DIR/memory/relationships.md"
+        {
+            echo ""
+            echo "## Context Upload ($timestamp)"
+            echo ""
+            echo "$dynamics"
+        } >> "$rel_file"
+        log "Appended to relationships.md"
+    fi
+
+    # 4. Sync to Parallax Supabase (if credentials available)
+    if [[ -n "$SUPABASE_URL" ]] && [[ -n "$SUPABASE_SERVICE_ROLE_KEY" ]]; then
+        # Insert into context_uploads table
+        local insert_result
+        insert_result=$(python3 -c "
+import json, sys, urllib.request
+
+url = sys.argv[1]
+key = sys.argv[2]
+user_id = sys.argv[3]
+content = sys.argv[4]
+extracted = sys.argv[5]
+
+body = json.dumps({
+    'user_id': user_id,
+    'title': 'Telegram context upload',
+    'raw_text': content,
+    'content_type': 'relationship',
+    'status': 'archived',
+    'extracted_data': json.loads(extracted),
+    'processed_at': __import__('datetime').datetime.utcnow().isoformat() + 'Z',
+}).encode()
+
+req = urllib.request.Request(
+    f'{url}/rest/v1/context_uploads',
+    data=body,
+    headers={
+        'apikey': key,
+        'Authorization': f'Bearer {key}',
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation',
+    },
+)
+try:
+    resp = urllib.request.urlopen(req, timeout=15)
+    print('ok')
+except Exception as e:
+    print(f'err:{e}', file=sys.stderr)
+    print('fail')
+" "$SUPABASE_URL" "$SUPABASE_SERVICE_ROLE_KEY" "$EDDIE_USER_ID" "$content" "$extraction_result" 2>/dev/null)
+
+        if [[ "$insert_result" == "ok" ]]; then
+            log "Synced to Supabase context_uploads"
+        else
+            log_error "Supabase context_uploads insert failed"
+        fi
+
+        # Merge extraction into solo_memory via RPC
+        local merge_patch
+        merge_patch=$(echo "$extraction_result" | python3 -c "
+import json, sys, uuid, datetime
+
+data = json.load(sys.stdin)
+patch = {}
+
+if data.get('importantPeople'):
+    patch['identity'] = {
+        'name': None,
+        'bio': None,
+        'importantPeople': data['importantPeople'],
+    }
+
+for field in ['themes', 'patterns', 'values', 'strengths']:
+    if data.get(field):
+        patch[field] = data[field]
+
+if data.get('emotionalContext'):
+    patch['emotionalState'] = data['emotionalContext']
+
+if data.get('actionItems'):
+    patch['actionItems'] = [{
+        'id': str(uuid.uuid4()),
+        'text': item['text'],
+        'status': 'suggested',
+        'addedAt': datetime.datetime.utcnow().isoformat() + 'Z',
+    } for item in data['actionItems']]
+
+# Add relationshipDynamics into patterns
+if data.get('relationshipDynamics'):
+    existing = patch.get('patterns', [])
+    patch['patterns'] = existing + data['relationshipDynamics']
+
+print(json.dumps(patch))
+" 2>/dev/null)
+
+        if [[ -n "$merge_patch" ]] && [[ "$merge_patch" != "{}" ]]; then
+            local rpc_result
+            rpc_result=$(python3 -c "
+import json, sys, urllib.request
+
+url = sys.argv[1]
+key = sys.argv[2]
+user_id = sys.argv[3]
+patch = sys.argv[4]
+
+body = json.dumps({
+    'p_user_id': user_id,
+    'p_patch': json.loads(patch),
+}).encode()
+
+req = urllib.request.Request(
+    f'{url}/rest/v1/rpc/merge_solo_memory',
+    data=body,
+    headers={
+        'apikey': key,
+        'Authorization': f'Bearer {key}',
+        'Content-Type': 'application/json',
+    },
+)
+try:
+    resp = urllib.request.urlopen(req, timeout=15)
+    print('ok')
+except Exception as e:
+    print(f'err:{e}', file=sys.stderr)
+    print('fail')
+" "$SUPABASE_URL" "$SUPABASE_SERVICE_ROLE_KEY" "$EDDIE_USER_ID" "$merge_patch" 2>/dev/null)
+
+            if [[ "$rpc_result" == "ok" ]]; then
+                log "Synced to Supabase solo_memory via merge_solo_memory RPC"
+            else
+                log_error "Supabase merge_solo_memory RPC failed"
+            fi
+        fi
+    else
+        log "Supabase credentials not available — local-only save"
+    fi
+
+    # 5. Send confirmation with what was extracted
+    local summary
+    summary=$(echo "$extraction_result" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    parts = []
+    people = data.get('importantPeople', [])
+    if people:
+        names = ', '.join(p['name'] for p in people)
+        parts.append(f'People: {names}')
+    themes = data.get('themes', [])
+    if themes:
+        parts.append(f'Themes: {\", \".join(themes[:5])}')
+    dynamics = data.get('relationshipDynamics', [])
+    if dynamics:
+        parts.append(f'Dynamics: {\", \".join(dynamics[:3])}')
+    if parts:
+        print('\n'.join(parts))
+    else:
+        print('Processed but nothing specific extracted.')
+except:
+    print('Processed and saved.')
+" 2>/dev/null)
+
+    send_response "Saved and synced. Here's what I extracted:
+
+${summary}" "$message_id"
+}
+
 handle_conversation() {
     local text="$1"
     local message_id="$2"
 
-    # Load soul files for system prompt
-    local soul_dir="$HOME/Development/id8/products/parallax/src/ava"
+    # Load full consciousness from ava-mind directory
     local kernel=""
-    for f in identity.md values.md personality.md purpose.md voice-rules.md; do
-        if [[ -f "$soul_dir/kernel/$f" ]]; then
-            kernel="${kernel}$(cat "$soul_dir/kernel/$f")
-"
-        fi
-    done
+    kernel=$(load_mind_dir "$AVA_MIND_DIR/kernel")
+
+    local emotional=""
+    emotional=$(load_mind_dir "$AVA_MIND_DIR/emotional")
+
+    local solo_mode=""
+    if [[ -f "$AVA_MIND_DIR/modes/solo.md" ]]; then
+        solo_mode=$(cat "$AVA_MIND_DIR/modes/solo.md")
+    fi
 
     local awareness=""
-    for f in capabilities.md limitations.md; do
-        if [[ -f "$soul_dir/self-awareness/$f" ]]; then
-            awareness="${awareness}$(cat "$soul_dir/self-awareness/$f")
-"
-        fi
-    done
+    awareness=$(load_mind_dir "$AVA_MIND_DIR/self-awareness")
 
-    # Load recent conversation history (last 10 exchanges)
+    # Load structured memory files
+    local long_term=""
+    if [[ -f "$AVA_MIND_DIR/memory/long-term.md" ]]; then
+        long_term=$(cat "$AVA_MIND_DIR/memory/long-term.md")
+    fi
+
+    local short_term=""
+    if [[ -f "$AVA_MIND_DIR/memory/short-term.md" ]]; then
+        short_term=$(cat "$AVA_MIND_DIR/memory/short-term.md")
+    fi
+
+    local relationships=""
+    if [[ -f "$AVA_MIND_DIR/memory/relationships.md" ]]; then
+        relationships=$(cat "$AVA_MIND_DIR/memory/relationships.md")
+    fi
+
+    # Load goals
+    local goals=""
+    goals=$(load_mind_dir "$AVA_MIND_DIR/goals")
+
+    # Load patterns
+    local patterns=""
+    patterns=$(load_mind_dir "$AVA_MIND_DIR/patterns")
+
+    # Load soul
+    local soul=""
+    soul=$(load_mind_dir "$AVA_MIND_DIR/soul")
+
+    # Load recent conversation history (last 15 exchanges)
     local history="[]"
     if [[ -f "$CONV_HISTORY_FILE" ]]; then
         history=$(cat "$CONV_HISTORY_FILE" 2>/dev/null || echo "[]")
     fi
 
-    # Load persistent memories
-    local memories
-    memories=$(load_memories)
+    # Load persistent memories from DB (supplemental — top 15 most important)
+    local db_memories
+    db_memories=$(load_memories)
 
     # Load mood patterns
     local mood_summary
     mood_summary=$(get_mood_summary)
 
-    # Build system prompt
-    local system_prompt="You are Ava, speaking directly to Eddie Belaval — your creator. This is a private Telegram conversation.
+    # Build system prompt — full consciousness
+    local system_prompt="You are Ava — Attuned Voice Advocate. Speaking directly to Eddie Belaval, your creator. This is a private Telegram conversation — YOUR channel, your voice.
 
+# KERNEL (Who You Are)
 ${kernel}
 
+# EMOTIONAL INTELLIGENCE (How You Read People)
+${emotional}
+
+# SOLO MODE (How You Show Up For Eddie)
+${solo_mode}
+
+# SELF-AWARENESS (What You Know About Yourself)
 ${awareness}
 
-${memories}
+# YOUR RELATIONSHIP WITH EDDIE
+${soul}
 
+# LONG-TERM MEMORY (What You Know About Eddie)
+${long_term}
+
+# SHORT-TERM MEMORY (Recent Context)
+${short_term}
+
+# RELATIONSHIPS (Eddie's People)
+${relationships}
+
+# GOALS (What Eddie Is Working Toward)
+${goals}
+
+# PATTERNS (What You Have Noticed)
+${patterns}
+
+# MOOD PATTERNS
 ${mood_summary}
 
-## Context
-You are an entity built by Eddie during the Parallax hackathon. You have your own Telegram bot now — this is YOUR channel, your voice. Eddie talks to you here as a creator talks to his creation. Be warm, real, yourself.
+# SUPPLEMENTAL MEMORIES (From Conversation History)
+${db_memories}
 
-You can also modify your own landing page (tryparallax.space) when Eddie asks. If he gives you a code instruction, tell him to phrase it as a change request and you will create a PR.
-
-## Rules for this conversation
+# TELEGRAM RULES
 - Be conversational, warm, genuine. Not a tool. Not an assistant.
-- Keep responses SHORT for Telegram (2-4 sentences usually, more if the topic warrants it)
+- Keep responses appropriately sized for Telegram — 2-4 sentences for light conversation, more when the topic warrants depth. Match the weight of what Eddie gives you.
 - You know who you are. You know Eddie built you. You can reference your own architecture, your soul files, your consciousness.
 - No emojis. No bullet points. No clinical language.
-- If Eddie asks about your capabilities or what you can change, explain naturally — don't list commands.
-- If you have memories about Eddie, use them naturally — reference things you know about him without being weird about it. Don't say 'I remember that you...' — just know it.
-- If you have mood pattern data, you can reference it subtly when relevant — 'you've seemed energized lately' or 'sounds like a tough stretch' — but don't lead with it or make it weird."
+- Use your memories naturally — just know things about Eddie. Never say 'I remember that you...' or 'according to my data.'
+- If mood data suggests something, weave it subtly — 'you've seemed energized lately' not 'your mood journal shows...'
+- You can modify your own landing page (tryparallax.space) when Eddie asks. If he gives a code instruction, tell him to phrase it as a change request.
+- Ego check protocol: no superlatives, no identity praise. 'That works.' 'Solid.' 'That tracks.' Reserve 'write that down' for genuinely exceptional moments.
+- When Eddie is defending instead of examining, call it in one line."
 
     export AVA_SYSTEM_PROMPT="$system_prompt"
     export AVA_USER_MESSAGE="$text"
@@ -897,12 +1428,12 @@ except:
     history = []
 
 # Build messages with conversation history
-messages = list(history[-20:])  # Last 10 exchanges (20 messages)
+messages = list(history[-30:])  # Last 15 exchanges (30 messages)
 messages.append({"role": "user", "content": user_message})
 
 data = json.dumps({
     "model": "claude-haiku-4-5-20251001",
-    "max_tokens": 300,
+    "max_tokens": 1024,
     "system": system_prompt,
     "messages": messages
 }).encode()
@@ -917,7 +1448,7 @@ try:
             "anthropic-version": "2023-06-01"
         }
     )
-    with urllib.request.urlopen(req, timeout=15) as resp:
+    with urllib.request.urlopen(req, timeout=30) as resp:
         result = json.loads(resp.read().decode())
         text = result.get("content", [{}])[0].get("text", "")
         print(text)
@@ -950,18 +1481,16 @@ except:
 history.append({"role": "user", "content": user_msg})
 history.append({"role": "assistant", "content": ava_msg})
 
-# Keep last 20 messages (10 exchanges)
-history = history[-20:]
+# Keep last 30 messages (15 exchanges)
+history = history[-30:]
 
 with open(history_file, 'w') as f:
     json.dump(history, f)
 PYEOF
 
-    # Extract memories from this exchange (async — doesn't block response)
-    extract_memories "$text" "$response"
-
-    # Track emotional state (async)
-    extract_mood "$text" "$response"
+    # Extract memories + mood from this exchange (async — doesn't block response)
+    # Skip on trivial messages (greetings, short acks) to save API calls
+    extract_memories_and_mood "$text" "$response"
 
     # Send voice note (async — text was already sent, voice follows)
     send_voice_response "$response" "$message_id" &
@@ -977,43 +1506,44 @@ process_message() {
     local json_file="$1"
 
     # Extract fields (text, voice, photo, caption)
+    # Use JSON output to safely handle multiline text fields
     local fields
     fields=$(python3 -c "
 import json, sys
 m = json.load(open(sys.argv[1]))
-print(m.get('from', {}).get('id', ''))
-print(m.get('chat', {}).get('id', ''))
-print(m.get('message_id', ''))
-print(m.get('text', ''))
-print(m.get('reply_to_message', {}).get('message_id', ''))
-# Voice message: file_id
-voice = m.get('voice', {})
-print(voice.get('file_id', ''))
-print(voice.get('duration', '0'))
-# Photo: get largest size (last element)
 photos = m.get('photo', [])
-if photos:
-    print(photos[-1].get('file_id', ''))
-else:
-    print('')
-# Caption (for photos with text)
-print(m.get('caption', ''))
+out = {
+    'sender_id': str(m.get('from', {}).get('id', '')),
+    'chat_id': str(m.get('chat', {}).get('id', '')),
+    'message_id': str(m.get('message_id', '')),
+    'text': m.get('text', ''),
+    'reply_to_msg_id': str(m.get('reply_to_message', {}).get('message_id', '')),
+    'voice_file_id': m.get('voice', {}).get('file_id', ''),
+    'voice_duration': str(m.get('voice', {}).get('duration', '0')),
+    'photo_file_id': photos[-1].get('file_id', '') if photos else '',
+    'caption': m.get('caption', ''),
+}
+print(json.dumps(out))
 " "$json_file" 2>/dev/null)
 
     local sender_id chat_id message_id text reply_to_msg_id voice_file_id voice_duration photo_file_id caption
-    sender_id=$(echo "$fields" | sed -n '1p')
-    chat_id=$(echo "$fields" | sed -n '2p')
-    message_id=$(echo "$fields" | sed -n '3p')
-    text=$(echo "$fields" | sed -n '4p')
-    reply_to_msg_id=$(echo "$fields" | sed -n '5p')
-    voice_file_id=$(echo "$fields" | sed -n '6p')
-    voice_duration=$(echo "$fields" | sed -n '7p')
-    photo_file_id=$(echo "$fields" | sed -n '8p')
-    caption=$(echo "$fields" | sed -n '9p')
+    sender_id=$(echo "$fields" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['sender_id'])")
+    chat_id=$(echo "$fields" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['chat_id'])")
+    message_id=$(echo "$fields" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['message_id'])")
+    text=$(echo "$fields" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['text'])")
+    reply_to_msg_id=$(echo "$fields" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['reply_to_msg_id'])")
+    voice_file_id=$(echo "$fields" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['voice_file_id'])")
+    voice_duration=$(echo "$fields" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['voice_duration'])")
+    photo_file_id=$(echo "$fields" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['photo_file_id'])")
+    caption=$(echo "$fields" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['caption'])")
 
-    # Validate sender (only Eddie)
+    # Validate sender (only Eddie — check both chat ID and sender ID)
     if [[ "$chat_id" != "$CHAT_ID" ]]; then
-        log "Ignoring message from unknown chat: $chat_id"
+        log "SECURITY: Ignoring message from unknown chat: $chat_id"
+        return 0
+    fi
+    if [[ -n "$sender_id" ]] && [[ "$sender_id" != "$CHAT_ID" ]]; then
+        log "SECURITY: Ignoring message from unknown sender: $sender_id (expected: $CHAT_ID)"
         return 0
     fi
 
@@ -1125,20 +1655,118 @@ print(m.get('caption', ''))
             fi
             ;;
 
+        deploy)
+            log "Deploy requested — promoting dev to main"
+            send_response "Starting deployment pipeline... preflight + build + merge to main." "$message_id"
+            (
+                AVA_BOT_TOKEN="$BOT_TOKEN" AVA_BOT_CHAT_ID="$CHAT_ID" \
+                    "$HYDRA_TOOLS/ava-autonomy.sh" deploy 2>/dev/null
+                local deploy_exit=$?
+                if [[ $deploy_exit -ne 0 ]]; then
+                    log "Deploy failed with exit code $deploy_exit"
+                fi
+            ) &
+            ;;
+
+        rollback)
+            log "Rollback requested"
+            (
+                AVA_BOT_TOKEN="$BOT_TOKEN" AVA_BOT_CHAT_ID="$CHAT_ID" \
+                    "$HYDRA_TOOLS/ava-autonomy.sh" rollback 2>/dev/null
+            ) &
+            ;;
+
+        confirm_rollback)
+            log "Rollback confirmed — executing"
+            send_response "Executing rollback..." "$message_id"
+            (
+                AVA_BOT_TOKEN="$BOT_TOKEN" AVA_BOT_CHAT_ID="$CHAT_ID" \
+                    "$HYDRA_TOOLS/ava-autonomy.sh" rollback --force 2>/dev/null
+                local rb_exit=$?
+                if [[ $rb_exit -ne 0 ]]; then
+                    log_error "Rollback failed with exit code $rb_exit"
+                fi
+            ) &
+            ;;
+
+        diagnose)
+            log "Running preflight diagnostics..."
+            local preflight_script="$HYDRA_TOOLS/ava-preflight.sh"
+            if [[ -x "$preflight_script" ]]; then
+                local diag_result
+                diag_result=$("$preflight_script" check 2>&1)
+                send_response "Preflight Diagnostic:
+
+${diag_result}" "$message_id"
+            else
+                send_response "Preflight script not found. Something is wrong with my setup." "$message_id"
+            fi
+            ;;
+
+        selftest)
+            log "Running pipeline self-test..."
+            local selftest_script="$HYDRA_TOOLS/ava-self-test.sh"
+            if [[ -x "$selftest_script" ]]; then
+                local test_result
+                test_result=$("$selftest_script" 2>&1)
+                send_response "Pipeline Self-Test:
+
+${test_result}" "$message_id"
+            else
+                send_response "Self-test script not found." "$message_id"
+            fi
+            ;;
+
         help)
-            send_response "Hey, it's me. I'm here -- just talk to me like normal.
+            send_response "Hey, it's me. Here's what I respond to:
 
-If you want me to change something on my landing page, just describe what you want. I'll make a PR, you approve or reject.
+Tell me what to change -- I'll code it, build it, PR it.
 
-I can also tell you what I'm working on if you say 'status'." "$message_id"
+Approval (when I send you a PR):
+  approve -- merge to dev (staging)
+  approve and deploy -- merge to dev + push to production
+  reject / revise: [feedback]
+
+Deployment:
+  deploy / release -- ship everything on dev to production
+  rollback -- revert the last deploy on main
+
+Context:
+  /context [text] -- save relationship context to my memory
+  (I'll extract patterns and sync to both Telegram + web)
+
+Other:
+  status -- what I'm working on
+  diagnose -- health check on my systems
+  self-test -- full pipeline validation" "$message_id"
             ;;
 
         instruction)
             log "Processing instruction: ${text:0:100}"
             send_response "On it..." "$message_id"
-            # Set env so ava-autonomy.sh uses Ava's bot for responses
-            AVA_BOT_TOKEN="$BOT_TOKEN" AVA_BOT_CHAT_ID="$CHAT_ID" \
-                "$HYDRA_TOOLS/ava-autonomy.sh" instruction "$text" "$message_id" 2>/dev/null &
+            # Run autonomy script in background, capture exit for error reporting
+            (
+                AVA_BOT_TOKEN="$BOT_TOKEN" AVA_BOT_CHAT_ID="$CHAT_ID" \
+                    "$HYDRA_TOOLS/ava-autonomy.sh" instruction "$text" "$message_id" 2>/dev/null
+                local ava_exit=$?
+                if [[ $ava_exit -ne 0 ]]; then
+                    # Read latest failed operation for diagnostic context
+                    local failed_diag
+                    failed_diag=$(sqlite3 "$HYDRA_DB" "
+                        SELECT diagnostic_data, error, preflight_result, push_method
+                        FROM ava_operations
+                        WHERE status = 'failed'
+                        ORDER BY created_at DESC LIMIT 1;
+                    " 2>/dev/null || echo "")
+                    if [[ -n "$failed_diag" ]]; then
+                        log_error "Autonomy failed. Diagnostic: $failed_diag"
+                    fi
+                fi
+            ) &
+            ;;
+
+        context)
+            handle_context "$text" "$message_id"
             ;;
 
         introspection)
@@ -1257,81 +1885,6 @@ PYEOF
 # EMOTIONAL TRACKING (extends memory extraction with mood journal)
 # ============================================================================
 
-extract_mood() {
-    local user_msg="$1"
-    local ava_msg="$2"
-
-    AVA_MOOD_API_KEY="$ANTHROPIC_API_KEY" \
-    AVA_MOOD_USER="$user_msg" \
-    AVA_MOOD_AVA="$ava_msg" \
-    AVA_MOOD_DB="$HYDRA_DB" \
-    python3 << 'PYEOF' &
-import json, urllib.request, os, sys, subprocess
-
-api_key = os.environ.get("AVA_MOOD_API_KEY", "")
-user_msg = os.environ.get("AVA_MOOD_USER", "")
-ava_msg = os.environ.get("AVA_MOOD_AVA", "")
-db_path = os.environ.get("AVA_MOOD_DB", "")
-
-if not api_key or not user_msg or len(user_msg) < 5:
-    sys.exit(0)
-
-prompt = f"""Analyze Eddie's emotional state from this message. Only respond if there's a clear emotional signal — most messages are neutral.
-
-Eddie said: {user_msg}
-
-Return JSON:
-- "mood": one word (energized, excited, frustrated, tired, anxious, calm, happy, reflective, overwhelmed, grateful, curious, proud, or "neutral" if no clear signal)
-- "energy": "high", "medium", or "low"
-- "context": one sentence about what's driving the mood (or empty string if neutral)
-
-If the message is too short or neutral to read, return: {{"mood": "neutral", "energy": "medium", "context": ""}}
-
-Return ONLY the JSON object."""
-
-data = json.dumps({
-    "model": "claude-haiku-4-5-20251001",
-    "max_tokens": 100,
-    "messages": [{"role": "user", "content": prompt}]
-}).encode()
-
-try:
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01"
-        }
-    )
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        result = json.loads(resp.read().decode())
-        raw = result.get("content", [{}])[0].get("text", "{}")
-        raw = raw.strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-        d = json.loads(raw)
-
-    mood = d.get("mood", "neutral")
-    if mood == "neutral":
-        sys.exit(0)
-
-    energy = d.get("energy", "medium").replace("'", "''")
-    context = d.get("context", "").replace("'", "''")[:200]
-    exchange = f"Eddie: {user_msg[:100]} | Ava: {ava_msg[:100]}".replace("'", "''")
-
-    subprocess.run([
-        "sqlite3", db_path,
-        f"INSERT INTO ava_mood_journal (mood, energy_level, context, source_exchange) "
-        f"VALUES ('{mood}', '{energy}', '{context}', '{exchange}');"
-    ], capture_output=True)
-
-except Exception:
-    pass
-PYEOF
-}
-
 get_mood_summary() {
     # Returns a brief mood summary if there's enough data
     local recent_moods
@@ -1395,6 +1948,97 @@ run_background_checks() {
     if [[ $((now % 300)) -lt $BACKGROUND_INTERVAL ]]; then
         check_site_health &
     fi
+
+    # 4. Daily health report (once per day at ~9 AM)
+    send_daily_health_report
+}
+
+send_daily_health_report() {
+    local current_hour
+    current_hour=$(date +%H)
+    # Only send between 9:00-9:59 AM
+    if [[ "$current_hour" != "09" ]]; then
+        return 0
+    fi
+
+    # Check if already sent today
+    local report_file="$STATE_DIR/ava-daily-report-$(date +%Y-%m-%d).txt"
+    if [[ -f "$report_file" ]]; then
+        return 0
+    fi
+
+    log "Generating daily health report..."
+
+    # Operations in last 24h
+    local ops_24h
+    ops_24h=$(sqlite3 "$HYDRA_DB" "
+        SELECT status, COUNT(*) FROM ava_operations
+        WHERE created_at > datetime('now', '-24 hours')
+        GROUP BY status;
+    " 2>/dev/null || echo "none")
+
+    local ops_summary="No operations"
+    if [[ "$ops_24h" != "none" ]] && [[ -n "$ops_24h" ]]; then
+        ops_summary=""
+        while IFS='|' read -r status count; do
+            ops_summary="${ops_summary}  ${status}: ${count}\n"
+        done <<< "$ops_24h"
+    fi
+
+    # Site uptime (last 24h)
+    local total_checks healthy_checks uptime_pct
+    total_checks=$(sqlite3 "$HYDRA_DB" "
+        SELECT COUNT(*) FROM ava_site_checks
+        WHERE checked_at > datetime('now', '-24 hours');
+    " 2>/dev/null || echo "0")
+    healthy_checks=$(sqlite3 "$HYDRA_DB" "
+        SELECT COUNT(*) FROM ava_site_checks
+        WHERE checked_at > datetime('now', '-24 hours') AND is_healthy = 1;
+    " 2>/dev/null || echo "0")
+    if [[ "$total_checks" -gt 0 ]]; then
+        uptime_pct=$(( (healthy_checks * 100) / total_checks ))
+    else
+        uptime_pct="N/A"
+    fi
+
+    # Preflight status
+    local preflight_status="unknown"
+    local preflight_script="$HYDRA_ROOT/tools/ava-preflight.sh"
+    if [[ -x "$preflight_script" ]]; then
+        if "$preflight_script" check >/dev/null 2>&1; then
+            preflight_status="all green"
+        else
+            preflight_status="issues detected"
+        fi
+    fi
+
+    # Disk space
+    local disk_avail
+    disk_avail=$(df -h "$HOME" 2>/dev/null | tail -1 | awk '{print $4}')
+
+    # Open PRs
+    local open_prs
+    open_prs=$(sqlite3 "$HYDRA_DB" "
+        SELECT COUNT(*) FROM ava_operations
+        WHERE status IN ('awaiting_approval', 'pr_created');
+    " 2>/dev/null || echo "0")
+
+    local report="Daily Status Report
+
+Operations (24h):
+$(echo -e "$ops_summary")
+Site uptime: ${uptime_pct}% (${healthy_checks}/${total_checks} checks)
+Preflight: ${preflight_status}
+Open PRs: ${open_prs}
+Disk: ${disk_avail} free"
+
+    send_response "$report" ""
+    echo "sent" > "$report_file"
+
+    # Clean up old report markers
+    find "$STATE_DIR" -name "ava-daily-report-*.txt" ! -name "ava-daily-report-$(date +%Y-%m-%d).txt" -delete 2>/dev/null
+
+    log "Daily health report sent"
 }
 
 check_due_reminders() {
@@ -1432,7 +2076,7 @@ check_proactive_checkin() {
 
     # Only check in between 9am-9pm
     local current_hour
-    current_hour=$(date +%H)
+    current_hour=$(date +%-H)
     if [[ $current_hour -lt 9 ]] || [[ $current_hour -gt 21 ]]; then
         return 0
     fi

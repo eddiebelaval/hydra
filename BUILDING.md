@@ -2,7 +2,7 @@
 
 *The build log for HYDRA. What shipped, why it was built, and what we learned.*
 
-Last updated: 2026-03-20
+Last updated: 2026-04-01
 
 ---
 
@@ -184,3 +184,24 @@ The three missing pieces are independent features, each requiring work on both t
 - Fail-fast: optionally fail parent immediately when any child fails
 - Crash recovery: lease-based claims with stale detection
 - CLI: hydra rt create/status/deps/resolve/tree
+
+---
+
+## Ava Telegram Listener: Cost Optimization (Apr 1, 2026)
+
+### What shipped
+Three changes to `daemons/ava-telegram-listener.sh` that reduce per-message API cost by ~85%:
+
+1. **Conversation model switched from Sonnet to Haiku.** Ava's personality comes from her consciousness files (kernel, soul, emotional layers), not the model's raw capability. Haiku 4.5 carries the personality just fine for casual Telegram conversation. Sonnet stays for image analysis, code introspection, context extraction, and instruction execution where model quality matters.
+
+2. **Memory extraction and mood tracking merged into a single Haiku call.** Previously two separate API calls per message. Same prompt now returns both memory objects and mood assessment in one JSON response.
+
+3. **Trivial message detection skips extraction entirely.** Messages under 15 chars matching common patterns (greetings, acks, single words) bypass the Haiku call completely. No value in asking "what should I remember?" about "ok" or "thanks".
+
+### Why
+API spend was running hot. The Ava listener fires on every incoming Telegram message, and the old pipeline made 3 API calls per message (1 Sonnet + 2 Haiku). With active conversation, that compounds fast. This was identified during a cost audit alongside a runaway lab sweep.
+
+### Architecture decisions
+- **Haiku for conversation, Sonnet for tools:** The intent classifier already routes messages to different handlers. Conversation is the high-volume, low-complexity path. Instruction/introspection/context are low-volume, high-complexity.
+- **Merged extraction over separate calls:** Memory and mood analysis share the same input (user message + Ava response). One prompt, one call, one parse. No reason they were ever separate.
+- **Keyword skip over LLM classification:** Using bash pattern matching for trivial detection instead of another LLM call. Fast, free, and correct enough for the purpose.
