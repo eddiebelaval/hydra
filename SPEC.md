@@ -1,5 +1,5 @@
 ---
-last-reconciled: 2026-03-20
+last-reconciled: 2026-04-01
 status: CURRENT
 ---
 
@@ -54,13 +54,14 @@ hydra.db (SQLite) + TECHNICAL_BRAIN.md (knowledge)
 
 ### Database Schema (hydra.db)
 
-agents, tasks, messages, notifications, activities, standups, cost_records, daily_priorities, conversation_threads, observations, reflections, system_health, agent_board
+agents, tasks, messages, notifications, activities, standups, cost_records, daily_priorities, conversation_threads, observations, reflections, system_health, agent_board, rt_jobs, rt_job_deps, rt_runs, rt_run_claims, rt_run_deps, rt_events
 
 ### Key Files
 
 - **Daemons:** `~/.hydra/daemons/` (20 scripts)
 - **Tools:** `~/.hydra/tools/` (35 scripts)
 - **Config:** `~/.hydra/config/` (telegram.env, repos.sh, agents.yaml)
+- **Runtime Engine:** ~/.hydra/runtime/ (Python: readiness_engine, claim_and_execute, delegate, rt_cli, rt_db)
 - **Knowledge:** TECHNICAL_BRAIN.md, SOUL.md, GOALS.md, JOURNEY.md
 - **State:** `~/.hydra/state/` (JSON state files, flag files)
 - **LaunchAgents:** `~/Library/LaunchAgents/com.hydra.*.plist`
@@ -98,3 +99,4 @@ Three files to add a capability:
 | MC integration (read) | Morning planner reads MC signals | Haiku context for priority suggestions |
 | Memory guard | 60s vm_stat monitoring | Auto-kill on pressure |
 | Health monitoring | 30-min heartbeat, 5 checks | SQLite + alerts |
+| Runtime engine | Phase 2 (delegation) | rt_* tables, readiness engine, claim/execute, delegation API |

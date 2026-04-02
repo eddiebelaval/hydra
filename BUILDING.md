@@ -159,3 +159,28 @@ The three missing pieces are independent features, each requiring work on both t
 1. **Bi-directional Telegram bridge:** MC needs an endpoint or webhook that triggers HYDRA's Telegram bot to send messages. HYDRA needs a handler for MC-originated alerts.
 2. **MC-driven priority suggestions:** MC needs a derived-signals engine that analyzes cross-product patterns and generates priority recommendations. HYDRA's morning planner would read these instead of (or in addition to) raw signals.
 3. **Centralized signal routing:** Requires MC to become the canonical state store, with HYDRA reading from MC rather than maintaining parallel SQLite state for observations and health data.
+
+---
+
+## Runtime Engine (Phase 1 + 2)
+
+**Why:** Agents operated independently on fixed timers with no ability to delegate work to each other. MILO couldn't tell FORGE to build something and wait for the result.
+
+**What:** Durable execution engine with agent delegation. New rt_* tables in hydra.db (rt_jobs, rt_job_deps, rt_runs, rt_run_claims, rt_run_deps, rt_events). Python runtime layer at ~/.hydra/runtime/.
+
+**Architecture Decisions:**
+- Progressive merge: new tables coexist with existing tasks/task_runs tables
+- rt_* prefix for clean namespace separation
+- Python for runtime logic (state machines are painful in bash), existing bash daemons unchanged
+- SQLite WAL mode for concurrent read/write safety
+- Tiered wake: heartbeat timers + launchctl kickstart for urgent/delegation work
+- Atomic claim via BEGIN IMMEDIATE to prevent double-execution
+- target_id in rt_run_deps points to child JOB id (not run id) because jobs survive retries
+
+**Key capabilities:**
+- Job dependency graph (job B waits for job A to complete)
+- Durable delegation: parent delegates to child, pauses, resumes when child completes
+- Fan-out/fan-in: delegate to N agents in parallel, resume when all complete
+- Fail-fast: optionally fail parent immediately when any child fails
+- Crash recovery: lease-based claims with stale detection
+- CLI: hydra rt create/status/deps/resolve/tree
