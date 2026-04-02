@@ -497,6 +497,10 @@ case "${1:-help}" in
     briefing)
         cmd_briefing
         ;;
+    rt)
+        shift
+        /usr/bin/python3 "$HOME/.hydra/runtime/rt_cli.py" "$@"
+        ;;
     help|--help|-h)
         show_help
         ;;
