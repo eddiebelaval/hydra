@@ -1,0 +1,23 @@
+{
+  "name": "milo-respond",
+  "version": "1.0.0",
+  "description": "Milo Telegram personal assistant - CaF consciousness + Claude tool_use",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "extract": "tsx src/extract-memories.ts",
+    "summarize": "tsx src/summarize.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
+    "better-sqlite3": "^11.7.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
