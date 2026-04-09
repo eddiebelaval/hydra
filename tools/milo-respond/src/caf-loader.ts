@@ -11,6 +11,7 @@
  *   4. Models     (per context) -- models/
  *   5. Relational (chat only)  -- relationships/ + wound behavioral residue
  *   6. Habits     (at edges)   -- habits/ (routines + creative, no coping)
+ *   7. Memory     (chat only)  -- memory/architecture (brain-derived taxonomy)
  */
 
 import fs from 'fs'
@@ -118,6 +119,10 @@ function composeHabits(): string {
   return [routines, creative].filter(Boolean).join('\n\n')
 }
 
+function composeMemoryArchitecture(): string {
+  return readFile('memory/architecture')
+}
+
 // -- Training Docs (operational intelligence) --
 
 const BRAIN_ROOT = process.env.MILO_BRAIN_ROOT || `${process.env.HOME}/.hydra/milo-brain`
@@ -185,6 +190,7 @@ export function composeMiloPrompt(context: MiloContext = 'chat'): string {
       parts.push(composeModels())
       parts.push(composeRelational())
       parts.push(composeHabits())
+      parts.push(composeMemoryArchitecture())
       break
     }
     case 'morning_briefing': {
