@@ -25,11 +25,14 @@ function parseArgs(): { userMessage: string; assistantMessage: string } {
   return { userMessage, assistantMessage }
 }
 
+type MemoryCategory = 'fact' | 'preference' | 'relationship' | 'decision' | 'project' | 'pattern' | 'antipattern' | 'milestone' | 'observation' | 'feedback' | 'location' | 'trip' | 'event_memory' | 'routine' | 'financial' | 'health'
+
 interface Extraction {
   memories: Array<{
     content: string
-    category: 'fact' | 'preference' | 'project_context' | 'relationship' | 'milestone' | 'decision'
+    category: MemoryCategory
     importance: number
+    domain: string | null
   }>
   mood: string | null
   energy: string | null
@@ -52,18 +55,36 @@ Milo: ${assistantMessage}
 Return ONLY valid JSON (no markdown):
 {
   "memories": [
-    {"content": "one sentence fact worth remembering", "category": "fact|preference|project_context|relationship|milestone|decision", "importance": 1-10}
+    {"content": "one sentence fact worth remembering", "category": "fact", "importance": 5, "domain": "homer"}
   ],
   "mood": "one word mood or null",
   "energy": "high|medium|low or null",
   "mood_context": "brief context for the mood or null"
 }
 
+Memory categories (pick the most specific one):
+- fact: verifiable biographical fact about Eddie
+- preference: how Eddie likes things done
+- relationship: who someone is and how Eddie relates to them
+- decision: a choice Eddie committed to, with reasoning
+- project: current state or key detail about a specific project
+- pattern: something that works, a repeatable approach
+- antipattern: something that fails, a trap or bad habit
+- milestone: a significant past event or achievement
+- observation: something you notice about Eddie (your own analysis)
+- feedback: how Eddie told you to behave differently
+- location: a place that matters to Eddie
+- trip: a journey or travel experience
+- event_memory: a notable past event (not a trip or milestone)
+- routine: a recurring habit or ritual
+- financial: money-related fact or event
+- health: physical or mental health observation
+
+Domain is optional -- the project or life area this relates to (e.g., homer, parallax, trading, cpn, fitness, family). Use null if not specific.
+
 Rules:
 - Only extract memories that are NEW information worth keeping long-term
 - Skip trivial exchanges, greetings, or information already obvious from context
-- Category "decision" = Eddie committed to doing something
-- Category "milestone" = Something significant happened or was completed
 - Importance 8-10 = life/business changing. 5-7 = notable. 1-4 = minor but worth noting.
 - If nothing worth extracting, return empty memories array
 - Mood should reflect Eddie's emotional state, not the topic`,
@@ -96,8 +117,8 @@ async function main() {
       ).get(`%${mem.content.substring(0, 30)}%`)
 
       if (!existing) {
-        db.prepare('INSERT INTO milo_memories (content, category, importance) VALUES (?, ?, ?)').run(
-          mem.content, mem.category, mem.importance
+        db.prepare('INSERT INTO milo_memories (content, category, importance, domain) VALUES (?, ?, ?, ?)').run(
+          mem.content, mem.category, mem.importance, mem.domain || null
         )
       }
     }

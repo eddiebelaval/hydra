@@ -52,13 +52,39 @@ export function loadContext(sessionId: string, rollingWindow: number = 40, summa
       ORDER BY starts_at ASC
     `).all() as MiloEvent[]
 
-    const memories = db.prepare(`
+    // Smart memory loading: prioritize behavioral calibration, then recency, then importance
+    const priorityMemories = db.prepare(`
       SELECT id, content, category, importance, created_at
       FROM milo_memories
-      WHERE superseded_by IS NULL
+      WHERE superseded_by IS NULL AND category IN ('feedback', 'preference', 'relationship')
+      ORDER BY importance DESC, created_at DESC
+      LIMIT 8
+    `).all() as Memory[]
+
+    const priorityIds = new Set(priorityMemories.map(m => m.id))
+    const remainingLimit = Math.max(0, memoryLimit - priorityMemories.length)
+
+    const recentMemories = db.prepare(`
+      SELECT id, content, category, importance, created_at
+      FROM milo_memories
+      WHERE superseded_by IS NULL AND id NOT IN (${[...priorityIds].map(() => '?').join(',') || '-1'})
+      ORDER BY created_at DESC
+      LIMIT 4
+    `).all(...priorityIds) as Memory[]
+
+    const recentIds = new Set(recentMemories.map(m => m.id))
+    const allLoadedIds = new Set([...priorityIds, ...recentIds])
+    const importanceLimit = Math.max(0, remainingLimit - recentMemories.length)
+
+    const importanceMemories = db.prepare(`
+      SELECT id, content, category, importance, created_at
+      FROM milo_memories
+      WHERE superseded_by IS NULL AND id NOT IN (${[...allLoadedIds].map(() => '?').join(',') || '-1'})
       ORDER BY importance DESC, created_at DESC
       LIMIT ?
-    `).all(memoryLimit) as Memory[]
+    `).all(...allLoadedIds, importanceLimit) as Memory[]
+
+    const memories = [...priorityMemories, ...recentMemories, ...importanceMemories]
 
     const moods = db.prepare(`
       SELECT mood, energy_level, context, created_at
@@ -108,9 +134,12 @@ export function formatContextForPrompt(ctx: ContextWindow): string {
   }
 
   if (ctx.memories.length > 0) {
-    sections.push(`## What You Know About Eddie\n${ctx.memories.map(m =>
-      `- [${m.category}] ${m.content}`
-    ).join('\n')}`)
+    sections.push(`## What You Know About Eddie\n${ctx.memories.map(m => {
+      const tag = (m as unknown as { domain?: string }).domain
+        ? `${m.category}:${(m as unknown as { domain: string }).domain}`
+        : m.category
+      return `- [${tag}] ${m.content}`
+    }).join('\n')}`)
   }
 
   if (ctx.moods.length > 0) {

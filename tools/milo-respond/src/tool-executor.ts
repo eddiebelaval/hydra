@@ -334,10 +334,10 @@ function saveMemory(input: Record<string, unknown>): ToolResult {
     }
 
     const stmt = db.prepare(`
-      INSERT INTO milo_memories (content, category, importance)
-      VALUES (?, ?, ?)
+      INSERT INTO milo_memories (content, category, importance, domain)
+      VALUES (?, ?, ?, ?)
     `)
-    const info = stmt.run(content, input.category, input.importance || 5)
+    const info = stmt.run(content, input.category, input.importance || 5, input.domain || null)
     return { success: true, data: { id: info.lastInsertRowid }, message: `Memory saved: ${content}` }
   } finally { db.close() }
 }
@@ -345,11 +345,12 @@ function saveMemory(input: Record<string, unknown>): ToolResult {
 function searchMemory(input: Record<string, unknown>): ToolResult {
   const db = getDb()
   try {
-    let sql = 'SELECT id, content, category, importance, created_at FROM milo_memories WHERE superseded_by IS NULL'
+    let sql = 'SELECT id, content, category, domain, importance, created_at FROM milo_memories WHERE superseded_by IS NULL'
     const params: unknown[] = []
 
     if (input.query) { sql += ' AND content LIKE ?'; params.push(`%${input.query}%`) }
     if (input.category) { sql += ' AND category = ?'; params.push(input.category) }
+    if (input.domain) { sql += ' AND domain = ?'; params.push(input.domain) }
 
     sql += ' ORDER BY importance DESC, created_at DESC LIMIT 20'
     const rows = db.prepare(sql).all(...params)
@@ -366,10 +367,11 @@ function searchMemory(input: Record<string, unknown>): ToolResult {
 function listMemories(input: Record<string, unknown>): ToolResult {
   const db = getDb()
   try {
-    let sql = 'SELECT id, content, category, importance, created_at FROM milo_memories WHERE superseded_by IS NULL'
+    let sql = 'SELECT id, content, category, domain, importance, created_at FROM milo_memories WHERE superseded_by IS NULL'
     const params: unknown[] = []
 
     if (input.category) { sql += ' AND category = ?'; params.push(input.category) }
+    if (input.domain) { sql += ' AND domain = ?'; params.push(input.domain) }
     sql += ' ORDER BY importance DESC, created_at DESC'
     sql += ` LIMIT ${(input.limit as number) || 20}`
 

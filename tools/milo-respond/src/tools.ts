@@ -229,36 +229,39 @@ const taskTools: ClaudeTool[] = [
 const memoryTools: ClaudeTool[] = [
   {
     name: 'save_memory',
-    description: 'Save an important fact, preference, or context for long-term recall.',
+    description: 'Save something worth remembering long-term. Pick the right category: fact (biographical), preference (how Eddie likes things), relationship (who someone is), decision (committed choice), project (project state), pattern (what works), antipattern (what fails), milestone (significant past event), observation (something you notice), feedback (how Eddie told you to behave), location (a place that matters), trip (a journey), event_memory (notable past event), routine (recurring habit), financial (money-related), health (physical/mental).',
     input_schema: {
       type: 'object' as const,
       properties: {
         content: { type: 'string' },
-        category: { type: 'string', enum: ['fact', 'preference', 'project_context', 'relationship', 'milestone', 'decision'] },
+        category: { type: 'string', enum: ['fact', 'preference', 'relationship', 'decision', 'project', 'pattern', 'antipattern', 'milestone', 'observation', 'feedback', 'location', 'trip', 'event_memory', 'routine', 'financial', 'health'] },
         importance: { type: 'number', description: '1-10 scale' },
+        domain: { type: 'string', description: 'What this memory is about (e.g., homer, trading, cpn, fitness, family). Optional.' },
       },
       required: ['content', 'category'],
     },
   },
   {
     name: 'search_memory',
-    description: 'Search memories by keyword or category.',
+    description: 'Search memories by keyword, category, or domain.',
     input_schema: {
       type: 'object' as const,
       properties: {
         query: { type: 'string' },
         category: { type: 'string' },
+        domain: { type: 'string', description: 'Filter by domain (e.g., homer, trading)' },
       },
       required: [],
     },
   },
   {
     name: 'list_memories',
-    description: 'List recent or important memories.',
+    description: 'List recent or important memories. Filter by category or domain.',
     input_schema: {
       type: 'object' as const,
       properties: {
         category: { type: 'string' },
+        domain: { type: 'string' },
         limit: { type: 'number' },
       },
       required: [],
