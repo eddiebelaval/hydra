@@ -135,6 +135,17 @@ const eventTools: ClaudeTool[] = [
       required: ['event_id'],
     },
   },
+  {
+    name: 'complete_event_by_title',
+    description: 'Mark an event as completed by title (fuzzy match). Use this when Eddie says a meeting happened, an event passed, or a reminder was handled. You do NOT need the event ID -- just the title or a close match. Also cleans up any duplicates of the same event.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        title: { type: 'string', description: 'The event title or a close match (case-insensitive)' },
+      },
+      required: ['title'],
+    },
+  },
 ]
 
 const taskTools: ClaudeTool[] = [

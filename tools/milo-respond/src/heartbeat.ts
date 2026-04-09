@@ -24,6 +24,7 @@ import Database from 'better-sqlite3'
 import fs from 'fs'
 import { execFileSync } from 'child_process'
 import { composeMiloPrompt } from './caf-loader.js'
+import { runSelfRepair, type RepairReport } from './self-repair.js'
 
 const DB_PATH = process.env.HYDRA_DB || `${process.env.HOME}/.hydra/hydra.db`
 const STATE_DIR = `${process.env.HOME}/.hydra/state`
@@ -466,9 +467,30 @@ function sendTelegram(text: string): void {
 // ============================================================================
 
 async function main() {
-  const db = new Database(DB_PATH, { readonly: true })
   const state = loadState()
   const beat = getCurrentBeat()
+
+  // Run self-repair first (writable DB) to clean data before scanning
+  let repairReport: RepairReport | null = null
+  try {
+    const writeDb = new Database(DB_PATH, { readonly: false })
+    try {
+      repairReport = runSelfRepair(writeDb)
+      if (repairReport.stats.auto_repaired > 0 || repairReport.stats.flagged > 0) {
+        const logLine = `[${new Date().toISOString()}] Self-repair: ${repairReport.stats.auto_repaired} auto-repaired, ${repairReport.stats.flagged} flagged\n`
+        fs.appendFileSync(HEARTBEAT_LOG, logLine)
+      }
+    } finally {
+      writeDb.close()
+    }
+  } catch (repairErr) {
+    // Self-repair failure must not block heartbeat
+    const logLine = `[${new Date().toISOString()}] Self-repair error (non-blocking): ${(repairErr as Error).message}\n`
+    fs.appendFileSync(HEARTBEAT_LOG, logLine)
+  }
+
+  // Now scan with clean data
+  const db = new Database(DB_PATH, { readonly: true })
 
   try {
     // Scan all tracked items
@@ -480,6 +502,21 @@ async function main() {
       ...scanTodos(db),
       ...scanConversationGaps(db),
     ]
+
+    // Surface flagged repair items as WARM so Milo can mention them
+    if (repairReport) {
+      const flaggedItems = repairReport.actions
+        .filter(a => a.action === 'flagged_for_review')
+        .map(a => ({
+          id: String(a.detection.entity_id),
+          source: 'repair' as const,
+          title: `Data issue: ${a.detection.description}`,
+          temperature: 60,
+          reason: a.details,
+          details: `[${a.detection.entity_type}] ${a.detection.description}`,
+        }))
+      items.push(...flaggedItems)
+    }
 
     items.sort((a, b) => b.temperature - a.temperature)
 

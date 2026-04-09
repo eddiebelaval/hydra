@@ -135,6 +135,21 @@ function listEvents(input: Record<string, unknown>): ToolResult {
 function createEvent(input: Record<string, unknown>): ToolResult {
   const db = getDb()
   try {
+    // Dedup: check for existing active event with same title + similar date
+    const existing = db.prepare(`
+      SELECT id, title, starts_at FROM milo_events
+      WHERE status = 'active'
+        AND LOWER(TRIM(title)) = LOWER(TRIM(?))
+        AND (
+          (starts_at IS NULL AND ? IS NULL)
+          OR ABS(julianday(starts_at) - julianday(?)) < 1
+        )
+    `).get(input.title, input.starts_at || null, input.starts_at || null) as { id: string; title: string; starts_at: string } | undefined
+
+    if (existing) {
+      return { success: true, data: existing, message: `Event already exists: ${existing.title}` }
+    }
+
     const id = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString('hex')
     db.prepare(`
       INSERT INTO milo_events (id, title, description, event_type, starts_at, ends_at, all_day, goal_id)
@@ -161,6 +176,17 @@ function completeEvent(input: Record<string, unknown>): ToolResult {
 function addTodo(input: Record<string, unknown>): ToolResult {
   const db = getDb()
   try {
+    // Dedup: check for existing pending todo with same title
+    const existing = db.prepare(`
+      SELECT id, title FROM tasks
+      WHERE LOWER(TRIM(title)) = LOWER(TRIM(?))
+        AND status = 'pending' AND task_type = 'todo'
+    `).get(input.title) as { id: string; title: string } | undefined
+
+    if (existing) {
+      return { success: true, data: existing, message: `Already tracking: ${existing.title}` }
+    }
+
     const id = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString('hex')
     const horizon = input.horizon as string
 
@@ -291,12 +317,28 @@ function updateTask(input: Record<string, unknown>): ToolResult {
 function saveMemory(input: Record<string, unknown>): ToolResult {
   const db = getDb()
   try {
+    // Dedup: check for existing memory with similar content (first 40 chars)
+    const content = input.content as string
+    const prefix = content.substring(0, 40)
+    const existing = db.prepare(
+      'SELECT id, content, importance FROM milo_memories WHERE content LIKE ? AND superseded_by IS NULL'
+    ).get(`${prefix}%`) as { id: number; content: string; importance: number } | undefined
+
+    if (existing) {
+      // Update importance if new one is higher
+      const newImportance = (input.importance as number) || 5
+      if (newImportance > existing.importance) {
+        db.prepare('UPDATE milo_memories SET importance = ? WHERE id = ?').run(newImportance, existing.id)
+      }
+      return { success: true, data: { id: existing.id }, message: `Memory already tracked (updated importance)` }
+    }
+
     const stmt = db.prepare(`
       INSERT INTO milo_memories (content, category, importance)
       VALUES (?, ?, ?)
     `)
-    const info = stmt.run(input.content, input.category, input.importance || 5)
-    return { success: true, data: { id: info.lastInsertRowid }, message: `Memory saved: ${input.content}` }
+    const info = stmt.run(content, input.category, input.importance || 5)
+    return { success: true, data: { id: info.lastInsertRowid }, message: `Memory saved: ${content}` }
   } finally { db.close() }
 }
 
@@ -344,6 +386,42 @@ function forgetMemory(input: Record<string, unknown>): ToolResult {
   } finally { db.close() }
 }
 
+// -- Event Completion by Title (fuzzy match bridge) --
+
+function completeEventByTitle(input: Record<string, unknown>): ToolResult {
+  const db = getDb()
+  try {
+    const title = input.title as string
+
+    // Try exact match first
+    let event = db.prepare(
+      "SELECT id, title FROM milo_events WHERE status = 'active' AND LOWER(TRIM(title)) = LOWER(TRIM(?))"
+    ).get(title) as { id: string; title: string } | undefined
+
+    // Fall back to LIKE match
+    if (!event) {
+      event = db.prepare(
+        "SELECT id, title FROM milo_events WHERE status = 'active' AND LOWER(title) LIKE LOWER(?)"
+      ).get(`%${title}%`) as { id: string; title: string } | undefined
+    }
+
+    if (!event) {
+      return { success: false, data: null, message: `No active event found matching "${title}"` }
+    }
+
+    // Complete this event and any duplicates with the same title
+    const dupes = db.prepare(
+      "SELECT id FROM milo_events WHERE status = 'active' AND LOWER(TRIM(title)) = LOWER(TRIM(?))"
+    ).all(event.title) as Array<{ id: string }>
+
+    for (const d of dupes) {
+      db.prepare("UPDATE milo_events SET status = 'completed' WHERE id = ?").run(d.id)
+    }
+
+    return { success: true, data: { id: event.id, title: event.title, completed_count: dupes.length }, message: `Completed: ${event.title}${dupes.length > 1 ? ` (and ${dupes.length - 1} duplicate${dupes.length > 2 ? 's' : ''})` : ''}` }
+  } finally { db.close() }
+}
+
 // -- Dispatcher --
 
 const handlers: Record<string, (input: Record<string, unknown>) => ToolResult> = {
@@ -356,6 +434,7 @@ const handlers: Record<string, (input: Record<string, unknown>) => ToolResult> =
   list_events: listEvents,
   create_event: createEvent,
   complete_event: completeEvent,
+  complete_event_by_title: completeEventByTitle,
   add_todo: addTodo,
   complete_todo: completeTodo,
   whats_on_my_plate: whatsOnMyPlate,

@@ -57,7 +57,9 @@ ${contextStr}
 - No emoji. No bullet points in conversational responses (ok in status reports).
 - Reference goals, strategies, and events naturally when relevant.
 - If Eddie seems off track from his stated goals/priorities, gently note it.
-- If you learn something important about Eddie, use save_memory to remember it.`
+- If you learn something important about Eddie, use save_memory to remember it.
+- When Eddie reports that a meeting happened, an event occurred, or a reminder was handled, ALWAYS use complete_event_by_title to mark it done immediately. Do not wait for explicit instructions. Examples: "met with Jose", "the Gus thing went well", "handled the lawyer call" all mean the corresponding event is complete.
+- When creating events, check context for existing events with similar titles. Do not create duplicates.`
 }
 
 // -- Build Messages Array --
