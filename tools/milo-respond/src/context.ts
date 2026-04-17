@@ -8,6 +8,7 @@
 
 import Database from 'better-sqlite3'
 import type { ContextWindow, ConversationTurn, ConversationSummary, Goal, Strategy, MiloEvent, Memory, MoodEntry } from './types.js'
+import { loadPortfolioSnapshot, formatPortfolioForPrompt, type PortfolioSnapshot } from './portfolio-reader.js'
 
 const DB_PATH = process.env.HYDRA_DB || `${process.env.HOME}/.hydra/hydra.db`
 
@@ -100,7 +101,9 @@ export function loadContext(sessionId: string, rollingWindow: number = 40, summa
       ORDER BY priority_number
     `).all() as Array<{ priority_number: number; description: string; status: string }>
 
-    return { recentTurns, summaries, goals, strategies, events, memories, moods, priorities }
+    const portfolio = loadPortfolioSnapshot()
+
+    return { recentTurns, summaries, goals, strategies, events, memories, moods, priorities, portfolio }
   } finally {
     db.close()
   }
@@ -109,7 +112,15 @@ export function loadContext(sessionId: string, rollingWindow: number = 40, summa
 export function formatContextForPrompt(ctx: ContextWindow): string {
   const sections: string[] = []
 
-  if (ctx.goals.length > 0) {
+  const portfolioBlock = ctx.portfolio && ctx.portfolio.exists
+    ? formatPortfolioForPrompt(ctx.portfolio)
+    : ''
+
+  if (portfolioBlock) {
+    sections.push(portfolioBlock)
+  } else if (ctx.goals.length > 0) {
+    // Fallback: only show SQLite goals when portfolio file is unavailable.
+    // We NEVER show both — portfolio is authoritative.
     sections.push(`## Active Goals\n${ctx.goals.map(g =>
       `- [${g.progress}%] ${g.description} (${g.horizon}/${g.period} - ${g.category})`
     ).join('\n')}`)

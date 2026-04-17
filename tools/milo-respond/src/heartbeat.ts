@@ -25,6 +25,7 @@ import fs from 'fs'
 import { execFileSync } from 'child_process'
 import { composeMiloPrompt } from './caf-loader.js'
 import { runSelfRepair, type RepairReport } from './self-repair.js'
+import { hasPortfolioFile } from './portfolio-reader.js'
 
 const DB_PATH = process.env.HYDRA_DB || `${process.env.HOME}/.hydra/hydra.db`
 const STATE_DIR = `${process.env.HOME}/.hydra/state`
@@ -91,6 +92,15 @@ function scanEvents(db: Database.Database): TrackedItem[] {
 
 function scanGoals(db: Database.Database): TrackedItem[] {
   const items: TrackedItem[] = []
+
+  // Short-circuit: if the portfolio file exists, portfolio is the authoritative
+  // source of truth for goal staleness. The legacy SQLite scan is stale-by-design
+  // because nothing was updating goal_checkins or updated_at, which is what caused
+  // fabricated "N days idle" pesters. Portfolio-driven context (see context.ts)
+  // already injects real last_touched metadata into the prompt — don't double up.
+  if (hasPortfolioFile()) {
+    return items
+  }
 
   const goals = db.prepare(`
     SELECT g.id, g.description, g.progress, g.horizon, g.period, g.category, g.updated_at,

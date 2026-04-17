@@ -85,6 +85,7 @@ export interface ContextWindow {
   memories: Memory[]
   moods: MoodEntry[]
   priorities: Array<{ priority_number: number; description: string; status: string }>
+  portfolio?: import('./portfolio-reader.js').PortfolioSnapshot
 }
 
 export interface ToolResult {
