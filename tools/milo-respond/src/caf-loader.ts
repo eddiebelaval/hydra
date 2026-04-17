@@ -159,25 +159,142 @@ function composeBrain(context: MiloContext): string {
 
 const LIFE_ROOT = process.env.LIFE_ROOT || `${process.env.HOME}/life`
 
+function formatMtime(filePath: string): string {
+  try {
+    const stat = fs.statSync(filePath)
+    return stat.mtime.toISOString().slice(0, 10)
+  } catch {
+    return 'unknown'
+  }
+}
+
 function loadLifeContext(): string {
   const parts: string[] = []
+  const sections: string[] = []
 
   // Load current state snapshot
+  const nowPath = path.join(LIFE_ROOT, 'NOW.md')
   try {
-    const now = fs.readFileSync(path.join(LIFE_ROOT, 'NOW.md'), 'utf-8').trim()
-    if (now) parts.push(`## Eddie's Current State (from ~/life/NOW.md)\n\n${now.substring(0, 3000)}`)
+    const now = fs.readFileSync(nowPath, 'utf-8').trim()
+    if (now) {
+      sections.push(`### Eddie's Current State (from ~/life/NOW.md, last updated ${formatMtime(nowPath)})\n\n${now.substring(0, 3000)}`)
+    }
   } catch { /* optional */ }
 
   // Load current goals
+  const goalsPath = path.join(LIFE_ROOT, 'GOALS.md')
   try {
-    const goals = fs.readFileSync(path.join(LIFE_ROOT, 'GOALS.md'), 'utf-8').trim()
-    if (goals) parts.push(`## Eddie's Life Goals (from ~/life/GOALS.md)\n\n${goals.substring(0, 2000)}`)
+    const goals = fs.readFileSync(goalsPath, 'utf-8').trim()
+    if (goals) {
+      sections.push(`### Eddie's Life Goals (from ~/life/GOALS.md, last updated ${formatMtime(goalsPath)})\n\n${goals.substring(0, 2000)}`)
+    }
   } catch { /* optional */ }
+
+  if (sections.length === 0) return ''
+
+  // Frame the whole block with an authority/staleness disclaimer so Milo doesn't
+  // echo retrospective sections ("March progress", "Anna dormant", "stalled", etc.)
+  // as if they were current state. The Portfolio Goals block (injected elsewhere
+  // in the prompt) is the operational source of truth — this is personal narrative.
+  parts.push(`## Eddie's Life Context (personal journal — historical narrative, NOT operational truth)`)
+  parts.push('')
+  parts.push('READING RULES:')
+  parts.push('- These files are weekly-updated personal journals, NOT current operational state.')
+  parts.push('- Retrospective sections (e.g., "March 2026", "Week of X", "What didn\'t happen") are HISTORY, not current.')
+  parts.push('- Do NOT quote dated progress claims, "dormant"/"stalled"/"paused" items, or past idle metrics as if they were today.')
+  parts.push('- If ANYTHING here conflicts with the "Portfolio Goals — Ground Truth" block, Portfolio wins.')
+  parts.push('- Use this for personality, relationship, and long-arc narrative context only.')
+  parts.push('')
+  parts.push(sections.join('\n\n'))
+
+  return parts.join('\n')
+}
+
+// -- Agent Coordination Layer Reader --
+//
+// Bridges Milo into the shared state that Claude Code sessions see via
+// MEMORY.md auto-load. Always reads the task board, bulletin, and people
+// index. Additionally reads full person files on demand when their names
+// appear in the current message. Lock-in surfacing is injected when Eddie
+// returns after a gap exceeding MILO_LOCKIN_THRESHOLD.
+
+const COORDINATION_ROOT = process.env.COORDINATION_ROOT ||
+  `${process.env.HOME}/.claude/projects/-Users-eddiebelaval-Development/memory`
+
+function matchPeopleInMessage(message: string): string[] {
+  try {
+    const indexPath = path.join(COORDINATION_ROOT, 'people', 'INDEX.md')
+    const index = fs.readFileSync(indexPath, 'utf-8')
+    const matches: string[] = []
+    const lowerMessage = message.toLowerCase()
+
+    for (const line of index.split('\n')) {
+      const m = line.match(/\|\s*\*\*([^*]+)\*\*\s*\|[^|]*\|\s*`([^`]+)`\s*\|/)
+      if (!m) continue
+      const shortName = m[1].trim().toLowerCase()
+      const filename = m[2].trim()
+
+      const escaped = shortName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const pattern = new RegExp(`\\b${escaped}\\b`)
+      if (pattern.test(lowerMessage)) {
+        matches.push(filename)
+      }
+    }
+
+    return matches
+  } catch {
+    return []
+  }
+}
+
+function loadCoordinationContext(currentMessage?: string, lockinFresh = false): string {
+  const parts: string[] = []
+
+  try {
+    const tasks = fs.readFileSync(path.join(COORDINATION_ROOT, 'active-tasks.md'), 'utf-8').trim()
+    if (tasks) parts.push(`## Shared Task Board (from active-tasks.md)\n\n${tasks.substring(0, 4000)}`)
+  } catch { /* optional */ }
+
+  try {
+    const bulletin = fs.readFileSync(path.join(COORDINATION_ROOT, 'bulletin.md'), 'utf-8').trim()
+    if (bulletin) parts.push(`## All-Hands Bulletin (from bulletin.md)\n\n${bulletin.substring(0, 4000)}`)
+  } catch { /* optional */ }
+
+  try {
+    const index = fs.readFileSync(path.join(COORDINATION_ROOT, 'people', 'INDEX.md'), 'utf-8').trim()
+    if (index) parts.push(`## People Index (from people/INDEX.md)\n\n${index.substring(0, 8000)}`)
+  } catch { /* optional */ }
+
+  if (currentMessage) {
+    const mentionedFiles = matchPeopleInMessage(currentMessage)
+    for (const file of mentionedFiles) {
+      try {
+        const content = fs.readFileSync(path.join(COORDINATION_ROOT, 'people', file), 'utf-8').trim()
+        if (content) parts.push(`## Person Detail: ${file}\n\n${content.substring(0, 3000)}`)
+      } catch { /* file may not exist */ }
+    }
+  }
+
+  if (lockinFresh) {
+    parts.push(`## LOCK-IN CATCH-UP
+
+Eddie is returning to this conversation after a gap of at least 2 hours. Before responding to his current message, scan the Shared Task Board and All-Hands Bulletin above against your conversation history. If there are new bulletin entries or meaningful task changes since the last time you spoke, proactively surface them in your opening. Phrase it naturally, e.g. "I see the Florida Realty thing actually landed" or "Looks like Rose is on the schedule now."
+
+If there is nothing genuinely new worth mentioning, greet Eddie normally and do not invent a catch-up. Honesty about what is actually new beats performed engagement every time.`)
+  }
 
   return parts.filter(Boolean).join('\n\n')
 }
 
-export function composeMiloPrompt(context: MiloContext = 'chat'): string {
+export interface ComposeMiloPromptOptions {
+  currentMessage?: string
+  lockinFresh?: boolean
+}
+
+export function composeMiloPrompt(
+  context: MiloContext = 'chat',
+  options: ComposeMiloPromptOptions = {}
+): string {
   const parts: string[] = []
 
   // Layer 1: CaF Consciousness (who Milo IS)
@@ -213,6 +330,7 @@ export function composeMiloPrompt(context: MiloContext = 'chat'): string {
   // Layer 3: Life Triad (Eddie's life context -- chat only, too much for nudges)
   if (context === 'chat') {
     parts.push(loadLifeContext())
+    parts.push(loadCoordinationContext(options.currentMessage, options.lockinFresh))
   }
 
   return parts.filter(Boolean).join('\n\n')
