@@ -23,9 +23,15 @@ HYDRA_REPOS=(
     "DeepStack TV|$HOME/Development/deepstack-tradingview|"
     "Consciousness|$HOME/Development/consciousness-framework|consciousness-framework"
     "Claude Code Sounds|$HOME/Development/claude-code-sounds|claude-code-sounds"
-    "LobeHub Local|$HOME/Development/lobehub-local|"
     "Speak2|$HOME/Development/Speak2|"
     "Mission Control|$HOME/Development/mission-control|mission-control"
+    "MILO|$HOME/Development/id8/products/milo|milo"
+    "DeepStack|$HOME/Development/id8/products/deepstack|deepstack"
+    "Vox|$HOME/Development/id8/products/vox|"
+    "Axis|$HOME/Development/id8/products/axis|"
+    "Pause|$HOME/Development/id8/products/pause|pause"
+    "Tool Factory|$HOME/Development/id8/tool-factory|"
+    "MemPalace|$HOME/Development/mempalace|"
 )
 
 MC_CLI="$HOME/Development/mission-control/bin/mc"

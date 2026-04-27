@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.hydra.readiness-engine</string>
+
+    <key>Comment</key>
+    <string>HYDRA Runtime: Readiness Engine - 30 second scheduler</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Users/eddiebelaval/.hydra/runtime/readiness_engine.py</string>
+        <string>--once</string>
+    </array>
+
+    <key>StartInterval</key>
+    <integer>30</integer>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/Users/eddiebelaval/.local/bin</string>
+        <key>HOME</key>
+        <string>/Users/eddiebelaval</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/eddiebelaval/Library/Logs/claude-automation/hydra-runtime/readiness-stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/eddiebelaval/Library/Logs/claude-automation/hydra-runtime/readiness-stderr.log</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>Nice</key>
+    <integer>15</integer>
+    <key>LowPriorityIO</key>
+    <true/>
+</dict>
+</plist>

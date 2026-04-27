@@ -1,0 +1,22 @@
+{
+  "name": "hydra-router",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
+    "better-sqlite3": "^11.10.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "classify": "tsx src/classifier.ts",
+    "enrich": "tsx src/seed-memories.ts",
+    "extract": "tsx src/hydra-extract-memories.ts"
+  }
+}

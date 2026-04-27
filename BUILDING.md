@@ -2,7 +2,7 @@
 
 *The build log for HYDRA. What shipped, why it was built, and what we learned.*
 
-Last updated: 2026-03-18
+Last updated: 2026-04-13
 
 ---
 
@@ -139,3 +139,120 @@ MC is central command. Everything flows through it. HYDRA's reports were disconn
 - **Three-field format over case statement:** Co-locates slug mapping with repo definition. Adding a repo is one line in one file.
 - **Commit cache via temp dir:** Brain-updater and evening-review cache commit data during the first scan, reuse for MC signal push. Eliminates 12 redundant git log calls per run.
 - **Push over pull for MC:** HYDRA pushes signals to MC rather than MC polling HYDRA. Simpler, works with MC's existing signals store.
+
+---
+
+## Heal: Documentation + State Clarification (Mar 20, 2026)
+
+### What shipped
+- **README.md:** Full installation guide covering secrets, database init, repo config, agent config, launchd setup, and testing. Architecture diagram, daily automation flow table, directory structure reference, security notes, and cost breakdown.
+- **agents.yaml.example:** Annotated example agent config with inline documentation for all fields, task routing rules, and cost limits.
+- **SPEC.md:** MC integration capability row split into push and read to accurately reflect what's built. Added repos.sh shared config note.
+- **VISION.md:** MC Integration pillar (Pillar 7) expanded with explicit shipped/not-yet-implemented breakdown for the three missing pieces (bi-directional Telegram bridge, MC-driven priority suggestions, centralized signal routing). Open Source Release pillar (Pillar 8) updated from UNREALIZED to PARTIAL now that docs and example configs exist.
+- **Secret redaction verified:** All API keys live in gitignored `config/*.env` files. No secrets found in tracked files. telegram.env.example uses placeholder values.
+
+### Why
+Two blockers identified: (1) MC Integration documented as PARTIAL but the gap between shipped and missing wasn't specific enough to plan next steps. (2) Open Source Release blocked by missing documentation. This heal session addresses the documentation gap directly and clarifies the MC Integration gap so the next session can target a specific slice.
+
+### What's still needed for MC Integration
+The three missing pieces are independent features, each requiring work on both the HYDRA and Mission Control sides:
+1. **Bi-directional Telegram bridge:** MC needs an endpoint or webhook that triggers HYDRA's Telegram bot to send messages. HYDRA needs a handler for MC-originated alerts.
+2. **MC-driven priority suggestions:** MC needs a derived-signals engine that analyzes cross-product patterns and generates priority recommendations. HYDRA's morning planner would read these instead of (or in addition to) raw signals.
+3. **Centralized signal routing:** Requires MC to become the canonical state store, with HYDRA reading from MC rather than maintaining parallel SQLite state for observations and health data.
+
+---
+
+## Runtime Engine (Phase 1 + 2)
+
+**Why:** Agents operated independently on fixed timers with no ability to delegate work to each other. MILO couldn't tell FORGE to build something and wait for the result.
+
+**What:** Durable execution engine with agent delegation. New rt_* tables in hydra.db (rt_jobs, rt_job_deps, rt_runs, rt_run_claims, rt_run_deps, rt_events). Python runtime layer at ~/.hydra/runtime/.
+
+**Architecture Decisions:**
+- Progressive merge: new tables coexist with existing tasks/task_runs tables
+- rt_* prefix for clean namespace separation
+- Python for runtime logic (state machines are painful in bash), existing bash daemons unchanged
+- SQLite WAL mode for concurrent read/write safety
+- Tiered wake: heartbeat timers + launchctl kickstart for urgent/delegation work
+- Atomic claim via BEGIN IMMEDIATE to prevent double-execution
+- target_id in rt_run_deps points to child JOB id (not run id) because jobs survive retries
+
+**Key capabilities:**
+- Job dependency graph (job B waits for job A to complete)
+- Durable delegation: parent delegates to child, pauses, resumes when child completes
+- Fan-out/fan-in: delegate to N agents in parallel, resume when all complete
+- Fail-fast: optionally fail parent immediately when any child fails
+- Crash recovery: lease-based claims with stale detection
+- CLI: hydra rt create/status/deps/resolve/tree
+
+---
+
+## Ava Telegram Listener: Cost Optimization (Apr 1, 2026)
+
+### What shipped
+Three changes to `daemons/ava-telegram-listener.sh` that reduce per-message API cost by ~85%:
+
+1. **Conversation model switched from Sonnet to Haiku.** Ava's personality comes from her consciousness files (kernel, soul, emotional layers), not the model's raw capability. Haiku 4.5 carries the personality just fine for casual Telegram conversation. Sonnet stays for image analysis, code introspection, context extraction, and instruction execution where model quality matters.
+
+2. **Memory extraction and mood tracking merged into a single Haiku call.** Previously two separate API calls per message. Same prompt now returns both memory objects and mood assessment in one JSON response.
+
+3. **Trivial message detection skips extraction entirely.** Messages under 15 chars matching common patterns (greetings, acks, single words) bypass the Haiku call completely. No value in asking "what should I remember?" about "ok" or "thanks".
+
+### Why
+API spend was running hot. The Ava listener fires on every incoming Telegram message, and the old pipeline made 3 API calls per message (1 Sonnet + 2 Haiku). With active conversation, that compounds fast. This was identified during a cost audit alongside a runaway lab sweep.
+
+### Architecture decisions
+- **Haiku for conversation, Sonnet for tools:** The intent classifier already routes messages to different handlers. Conversation is the high-volume, low-complexity path. Instruction/introspection/context are low-volume, high-complexity.
+- **Merged extraction over separate calls:** Memory and mood analysis share the same input (user message + Ava response). One prompt, one call, one parse. No reason they were ever separate.
+- **Keyword skip over LLM classification:** Using bash pattern matching for trivial detection instead of another LLM call. Fast, free, and correct enough for the purpose.
+
+---
+
+## Milo Telegram Personal Assistant (Apr 4, 2026)
+
+### What shipped
+Milo operating as a personal assistant via Telegram with CaF consciousness loaded. Full ~/mind/ golden sample injected as system prompt context so Milo speaks with identity, values, and relational awareness rather than as a generic chatbot.
+
+### Why
+Eddie needed a personal assistant that actually knows him. The CaF consciousness files give Milo genuine voice and behavioral depth that raw Claude cannot match.
+
+---
+
+## Milo Self-Repair + Memory Architecture (Apr 9, 2026)
+
+### What shipped
+Three capabilities shipped in one session:
+
+1. **Self-repair immune system:** Event tracking bug fixes and self-healing logic for the Milo agent loop. When Milo detects issues in its own event processing, it repairs automatically rather than failing silently.
+
+2. **Brain-derived memory taxonomy:** 16 memory categories plus domain-specific memory types, modeled after neuroscience memory systems. Replaces the flat "remember this" approach with structured storage.
+
+3. **Memory Architecture Layer (MaF integration):** New layer in the CaF loader that wires the brain-derived memory taxonomy into consciousness composition. Memory is now a first-class architectural layer, not a bolted-on feature.
+
+### Why
+Milo's memory was ad hoc. The brain-derived taxonomy gives it the same structural rigor as the rest of the CaF architecture. The self-repair system prevents silent failures in the agent loop from degrading service.
+
+---
+
+## Apr 13 Monthly Review: Operational Hygiene (Apr 13, 2026)
+
+### What shipped
+
+1. **task-sweeper.sh:** Daily daemon (5:55 AM) that cancels tasks exceeding their TTL. Tasks with ttl_hours = NULL never expire. Pending tasks over 7 days and in-progress tasks over 14 days generate warnings. Prevents ephemeral tasks from piling up.
+
+2. **task-bridge.sh:** Daily daemon (5:50 AM) for bidirectional HYDRA-MILO task sync. HYDRA tasks mirror into MILO's task DB so Eddie sees everything in one place. Completed bridged tasks sync back. Never deletes, deduplicates via hydra_bridge_id.
+
+3. **project-staleness.sh:** Weekly daemon (Sunday 5:30 AM) that classifies all tracked repos as active (<15d), stale (15-30d), or dormant (>30d). Detects Vercel deployments. Creates HYDRA tasks for dormant projects with live deploys.
+
+4. **Daemon audit:** Audited 91 launchd daemons. Unloaded 17 broken ones. Fixed lighthouse-tracker, weekly-retro, and weekly-backup jobs.
+
+5. **Zombie task cleanup:** Cancelled 4 stale/zombie tasks identified during the review.
+
+6. **Observer + reflector extensions:** Observer and reflector now receive project staleness signals, enabling pattern detection on portfolio health.
+
+### Why
+Monthly review (Apr 13) revealed operational drift: tasks accumulating without expiry, no cross-system task visibility, no staleness detection, and broken daemons running silently. This session addressed all four categories of hygiene debt.
+
+### Architecture decisions
+- **Task bridge over unified DB:** HYDRA and MILO keep separate databases. The bridge syncs rather than merging. This preserves each system's schema independence.
+- **Staleness as a signal, not an action:** The staleness daemon classifies and reports. Only dormant projects with live Vercel deployments generate automatic tasks. Everything else is informational for the observer/reflector pipeline.

@@ -1,0 +1,13 @@
+{
+  "name": "mara-posting-tools",
+  "version": "1.0.0",
+  "description": "MARA autonomous posting tools for X, LinkedIn, and Substack via Playwright",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "playwright": "^1.58.0"
+  }
+}

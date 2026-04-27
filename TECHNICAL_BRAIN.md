@@ -19,56 +19,51 @@ FORMAT RULES (responses go to Telegram):
 
 <!-- BRAIN-UPDATER:START -->
 ## Recent Git Activity
-*Auto-updated: 2026-03-18*
+*Auto-updated: 2026-04-27*
 
-**Homer**
-- Fixed **video autoplay race condition** on landing page
-- Completed **SEO audit** — added canonicals, meta tags, noindex, and viewport fixes
-- Resolved **CI build failure** with lazy Supabase initialization in email-capture
-- Disabled **scroll animations on mobile** viewports and filtered properties with placeholder addresses
-- Redirected broken agent registration and footer links to **waitlist** with updated hero CTA
-
-**Parallax**
-- Implemented **Haiku-powered message compaction** for solo and ava routes
-- Added **Guided Clarity System** — mental model framework for Ava with 31 comprehensive tests
-- Consolidated **Lab navigation** — merged changelog, update log, and Lab into single /lab route
-- Audited and fixed **Android mobile UI/UX** — overflow, touch targets, and responsive issues
-- Removed stale TypeScript expect-error directives and fixed HTMLMainElement type safety
+**Mission Control**
+- Shipped **flight-deck system** with living-review link integration
+- Executed **SQL migration strategy** (Option A) and updated task states
+- Implemented **PII remediation** with scrub audit and Gmail retrieval tasks
+- Wired **Homer execution layer** into master todo surface
+- Integrated **Golden Sample Plan** 8-step sequence into task management workflow
 <!-- BRAIN-UPDATER:END -->
 
 <!-- REFLECTOR:START -->
 ## Behavioral Patterns
-*Auto-updated: 2026-03-18 by HYDRA Reflector*
+*Auto-updated: 2026-04-27 by HYDRA Reflector*
 
-- **[CRITICAL]** Telegram became primary work interface: 18 low-priority "message_received" events logged 2026-03-08 19:14 (15-minute window), suggesting shift from structured task execution to reactive chat-based workflow
-- **[CRITICAL]** Task system integrity failure: "submitted" task marked done 2026-03-13 00:03 returned "task not found" despite dispatch confirmation—indicates database corruption or sync failure between task creation and completion tracking
-- **[CRITICAL]** Live trading transition executed without graduation: Kalshi Bot moved to live trading with 20% drawdown threshold 2026-03-12 08:40 despite paper trading removal—no graduation report or backtest validation documented before capital risk
-- **[CRITICAL]** Homer Q1 flagship goal (2-3 paying users) repeated verbatim across 5 days without progress metrics or conversion funnel updates—static goal restatement without execution signals
-- **[CRITICAL]** Disk space crisis acceleration: 11GB→8GB→5GB→0GB across 4 days (2026-03-05 to 2026-03-10) with auto-cleanup decision made 2026-03-06 08:04 but never implemented—critical infrastructure blocker ignored despite escalating alerts
-- **[CRITICAL]** Parallax hackathon deadline drift: Feb 16 submission deadline mentioned across 6 days (2026-03-05 through 2026-03-10) with no completion signal or deadline extension recorded—indicates missed deadline with no retrospective or pivot decision
-- **[CRITICAL]** Multi-project context switching pattern: Homer (9 services + compliance + pricing), Kalshi Bot (6 PRs merged 2026-03-06), Parallax (version gating + Reading Nook), Rune (launch blocked), id8Labs (finance module)—5 active products without prioritization hierarchy
-- **[CRITICAL]** Deployment pipeline instability: version auto-bumps executed 6+ times across week (1.4.1→1.10.0→1.11.0→1.14.1→1.15.0→1.17.1) with multiple same-day releases (2026-03-05: 1.10.0, 1.11.0, 1.15.0) suggests CI/CD configuration error causing premature releases without consolidation
-- **[CRITICAL]** Feature gate architecture shift: premium tier boundaries established 2026-03-01 (cycles API, self-fetching components, feature flags bd8d31c) then immediately revised 2026-03-01 13:00 ("Premium depth + memory edit for all tiers") indicates pricing model uncertainty threatening go-to-market strategy
-- **[CRITICAL]** Morning planner automation failure: 80+ duplicate "prompt sent to Eddie" entries across all days with identical timestamps (all at 13:00) signals broken cron job or message queue backup—coordination system reliability compromised
-- **[CRITICAL]** Admin authentication rework cycle: 4 separate implementations in 48 hours (2026-03-04 07:50 debug endpoint, 2026-03-04 13:00 email-based auth, 2026-03-04 13:00 diagnostic endpoint, 2026-03-04 13:00 protection routes) suggests security model uncertainty requiring immediate architecture decision
-- **[MODERATE]** Homer authentication became stability bottleneck: SSR hydration race conditions, OTP/PKCE issues, cookie races, infinite render loops fixed 2026-03-12 08:40—suggests auth system shipped before edge case hardening complete
-- **[MODERATE]** External research consumption pattern emerging: shared 4 repos/articles in 3 days (2026-03-07 autoresearch, 2026-03-08 everything-claude-code v1.8.0, 2026-03-09 Anthropic skill guide, 2026-03-12 agency-agents)—knowledge intake without documented application to active projects
-- **[MODERATE]** Kalshi Bot operational instrumentation wave: sensory monitor with 7-sense health checks every 15min, Supabase analytics pipeline, IBKR integration, trade sync fixes all shipped 2026-03-11-12—production hardening sprint after live trading decision
-- **[MODERATE]** Homer Stage 9 launch prep concentrated on Feb 9: 10 commits including compliance shield, pricing tiers, agent brand control, buyer analytics—major feature surface area expansion in single day suggests pre-deadline sprint
-- **[MODERATE]** Focus score collapse: 46%→33% decline with MILO flagged across 4 consecutive days (2026-03-05, 2026-03-07, 2026-03-08, 2026-03-09) but no corrective action or capacity reduction observed—productivity signal ignored
-- **[MODERATE]** Kalshi Bot operational maturity surge: 6 feature PRs merged in 48 hours (2026-03-06: PRs #57-63) including self-modification capability, paper balance flag, conversation memory, and governance fixes—suggests concentrated sprint before context switch
-- **[MODERATE]** Homer Deal Simulator shipped 2026-03-11 with 9 services including NotaryCoordinationService but no user testing or agent onboarding plan mentioned—enterprise feature launch without documented go-to-market execution
-- **[MODERATE]** Strategic pivot revelation: 2026-03-08 20:27 decision to abandon unicorn product vision for "stacking useful products" approach but no portfolio rationalization or sunset decisions followed—philosophy shift without execution plan
-- **[MODERATE]** Rune public launch blocker: "PR #1 open, awaiting merge and Supabase setup" repeated verbatim 5 times across 7 days (2026-03-05 through 2026-03-10) with zero progress—launch-blocking task deprioritized without explanation
-- **[MODERATE]** Academy content expansion velocity: 3 major additions in 72 hours (2026-02-28 Nervous System section PR #150, 2026-03-05 Reading Nook with 44 books, 2026-03-05 pedagogical arc restructure #207) without recorded user feedback indicates content-first rather than validation-driven approach
-- **[MODERATE]** API model migration pattern: Sonnet 4.5→4.6 upgrade executed 2026-03-01 with Opus reserved for mediation, but conversational routing shift required 3 separate commits (route updates, test fixes, architect expectations) suggests inadequate abstraction layer for model switching
-- **[MODERATE]** Disk space degradation trend: 44GB free 2026-03-05 → 19GB 2026-02-27 → 17GB 2026-02-28 → 12GB 2026-03-02 → 11GB 2026-03-05 indicates 33GB consumption in 6 days (5.5GB/day burn rate) with no cleanup actions observed—infrastructure maintenance deferred
-- **[MODERATE]** Documentation debt accumulation: BUILDING.md and JOURNEY.md updated 8+ times across week (2026-02-27, 2026-03-01, 2026-03-04, 2026-03-05 multiple times) suggests docs treated as post-hoc rather than inline—development velocity outpacing knowledge capture
-- **[MODERATE]** Scheduled sessions feature implementation pattern: full-stack build completed 2026-03-01 10:25, then Ava scheduling concierge overlay shipped 2026-03-05 with conversation-driven creation—suggests UI-first approach added intelligence layer after infrastructure complete
-- **[MODERATE]** Command execution error pattern: incomplete task-id parameters logged 2026-02-27 09:07 and 2026-03-04 07:50 with identical error signatures suggests persistent Telegram bot command parsing issue affecting task completion workflow
-- **[LOW]** Morning planner prompt noise: 45+ duplicate "sent to Eddie" observations across 7 days with varying priority tags (critical/moderate/low)—logging system creating false signal density in observation stream
-- **[LOW]** Marketing streak permanently at 0 days across entire week (2026-03-05 through 2026-03-11) with SCOUT assigned rebuild task but no completion signals—GTM execution completely stalled despite revenue goals
+No patterns consolidated yet. Reflector runs daily at 2 AM.
 <!-- REFLECTOR:END -->
+
+<!-- STALENESS:START -->
+## Project Staleness
+*Auto-updated 2026-04-27 11:22:04 by project-staleness.sh*
+
+Active: 13 | Stale: 2 | Dormant: 6 | Dormant+Deployed: 1
+
+- Vox (77d, dormant)
+- Speak2 (71d, dormant)
+- parallax-mobile (58d, dormant)
+- ejb.ventures (47d, dormant, deployed)
+- Tool Factory (38d, dormant)
+- Kalshi Bot (33d, dormant)
+- DeepStack TV (25d, stale)
+- MemPalace (21d, stale)
+- Consciousness (14d, active)
+- Claude Code Sounds (14d, active)
+- Axis (14d, active)
+- id8Labs Site (3d, active, deployed)
+- Homer (0d, active, deployed)
+- Parallax (0d, active, deployed)
+- Rune (0d, active, deployed)
+- Lexicon (0d, active, deployed)
+- Mission Control (0d, active, deployed)
+- MILO (0d, active, deployed)
+- DeepStack (0d, active, deployed)
+- Pause (0d, active, deployed)
+- cambium (0d, active)
+<!-- STALENESS:END -->
 
 ## 1. HYDRA - AI-Human Operating System
 

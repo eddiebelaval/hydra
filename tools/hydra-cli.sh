@@ -169,6 +169,8 @@ cmd_task_create() {
     read -p "Priority (1=critical, 2=high, 3=normal, 4=low) [3]: " priority
     priority=${priority:-3}
     read -p "Assign to (milo/forge/scout/pulse) [auto]: " assigned_to
+    read -p "TTL in hours (24=daily, 168=weekly, blank=no expiry) []: " ttl_hours
+    ttl_hours=${ttl_hours:-NULL}
 
     # Auto-assign based on type
     if [[ -z "$assigned_to" ]]; then
@@ -192,8 +194,8 @@ cmd_task_create() {
 
     # Insert task
     sqlite3 "$HYDRA_DB" "
-        INSERT INTO tasks (id, title, description, source, assigned_to, created_by, priority, task_type)
-        VALUES ('$task_id', '$safe_title', '$safe_desc', 'user', '$assigned_to', 'user', $priority, '$task_type');
+        INSERT INTO tasks (id, title, description, source, assigned_to, created_by, priority, task_type, ttl_hours)
+        VALUES ('$task_id', '$safe_title', '$safe_desc', 'user', '$assigned_to', 'user', $priority, '$task_type', $ttl_hours);
     "
 
     # Create notification
@@ -496,6 +498,10 @@ case "${1:-help}" in
         ;;
     briefing)
         cmd_briefing
+        ;;
+    rt)
+        shift
+        /usr/bin/python3 "$HOME/.hydra/runtime/rt_cli.py" "$@"
         ;;
     help|--help|-h)
         show_help

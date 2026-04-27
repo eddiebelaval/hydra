@@ -27,8 +27,13 @@ else
     sleep 3
     OLD_PID=$(cat "$LOCK_FILE" 2>/dev/null)
     if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
-        echo "Already running (PID $OLD_PID). Exiting."
-        exit 0
+        # Verify the PID is actually telegram-listener.sh, not a recycled PID
+        OLD_CMD=$(ps -p "$OLD_PID" -o args= 2>/dev/null || true)
+        if echo "$OLD_CMD" | grep -q "telegram-listener.sh"; then
+            echo "Already running (PID $OLD_PID). Exiting."
+            exit 0
+        fi
+        echo "Stale lock: PID $OLD_PID is not telegram-listener (is: $OLD_CMD). Reclaiming."
     fi
     # Stale lock (holder died without cleanup) — remove and try once
     rm -rf "$LOCK_DIR"
@@ -167,6 +172,67 @@ telegram_curl() {
 }
 
 send_response() {
+    local message="$1"
+    local reply_to="${2:-}"
+    local use_html="${3:-false}"
+
+    # Telegram has a 4096 char limit per message. Split long messages into chunks.
+    # We chunk at 3900 to leave room for formatting overhead.
+    local chunk_size=3900
+    local msg_len=${#message}
+
+    if [[ $msg_len -le $chunk_size ]]; then
+        # Short message: send directly
+        _send_single_message "$message" "$reply_to" "$use_html"
+    else
+        # Long message: split at paragraph boundaries and send as multiple messages
+        local chunks=()
+        local remaining="$message"
+
+        while [[ ${#remaining} -gt $chunk_size ]]; do
+            # Try to split at a double newline (paragraph break) near the limit
+            local candidate="${remaining:0:$chunk_size}"
+            local split_pos=$(printf '%s' "$candidate" | grep -aob $'\n\n' | tail -1 | cut -d: -f1 || echo "")
+
+            if [[ -n "$split_pos" && "$split_pos" -gt 500 ]]; then
+                # Split at paragraph break
+                chunks+=("${remaining:0:$split_pos}")
+                remaining="${remaining:$((split_pos+2))}"
+            else
+                # No good paragraph break found, try single newline
+                split_pos=$(printf '%s' "$candidate" | grep -aob $'\n' | tail -1 | cut -d: -f1 || echo "")
+                if [[ -n "$split_pos" && "$split_pos" -gt 500 ]]; then
+                    chunks+=("${remaining:0:$split_pos}")
+                    remaining="${remaining:$((split_pos+1))}"
+                else
+                    # Hard split at limit
+                    chunks+=("${remaining:0:$chunk_size}")
+                    remaining="${remaining:$chunk_size}"
+                fi
+            fi
+        done
+
+        # Add the final chunk
+        if [[ -n "$remaining" ]]; then
+            chunks+=("$remaining")
+        fi
+
+        # Send each chunk. First chunk gets reply_to, rest are standalone.
+        local first=true
+        for chunk in "${chunks[@]}"; do
+            if [[ "$first" == true ]]; then
+                _send_single_message "$chunk" "$reply_to" "$use_html"
+                first=false
+            else
+                _send_single_message "$chunk" "" "$use_html"
+                sleep 0.3  # Brief pause between chunks to maintain order
+            fi
+        done
+    fi
+}
+
+# Internal: send a single message (called by send_response)
+_send_single_message() {
     local message="$1"
     local reply_to="${2:-}"
     local use_html="${3:-false}"
@@ -472,6 +538,13 @@ JOURNEY_FILE="$HYDRA_ROOT/JOURNEY.md"
 SOUL_FILE="$HYDRA_ROOT/SOUL.md"
 GOALS_FILE="$HYDRA_ROOT/GOALS.md"
 
+# Agent Coordination Layer (shared state across Claude Code, Milo, HYDRA)
+# Every file here is also visible to other entities via MEMORY.md auto-load.
+COORDINATION_ROOT="${COORDINATION_ROOT:-$HOME/.claude/projects/-Users-eddiebelaval-Development/memory}"
+# Lock-in threshold: >= 2h gap triggers proactive catch-up surfacing
+# Per-user state files live at $STATE_DIR/hydra-telegram-last-${user_id}-epoch.txt
+HYDRA_LOCKIN_THRESHOLD="${HYDRA_LOCKIN_THRESHOLD:-7200}"
+
 ask_cto_brain() {
     local question="$1"
 
@@ -481,34 +554,148 @@ ask_cto_brain() {
         return 1
     fi
 
-    # Load technical knowledge
-    local system_context=""
-    if [[ -f "$TECHNICAL_BRAIN_FILE" ]]; then
-        system_context=$(cat "$TECHNICAL_BRAIN_FILE")
-    else
-        system_context="You are MILO, Eddie Belaval's CTO voice for id8Labs. Answer technical questions about their systems."
+    # Compose consciousness from golden sample via CaF loader
+    # compose-mind.py reads ~/Development/id8/products/milo/src/mind/
+    # using the same 6-layer architecture as the Electron loader:
+    #   Brainstem (kernel/) -> Limbic (emotional/) -> Drives -> Models -> Relational -> Habits
+    # Dotfiles (unconscious/) excluded. Wounds filtered to behavioral residue only.
+    local COMPOSE_MIND="$HYDRA_ROOT/tools/compose-mind.py"
+
+    # Lock-in freshness check: per-user state file so Eddie and Shah have independent
+    # gap tracking. If this user has been away >= HYDRA_LOCKIN_THRESHOLD, mark lock-in fresh.
+    local user_id_for_state="${HYDRA_USER_ID:-eddie}"
+    local user_state_file="$STATE_DIR/hydra-telegram-last-${user_id_for_state}-epoch.txt"
+    local lockin_fresh="0"
+    if [[ -f "$user_state_file" ]]; then
+        local last_epoch
+        last_epoch=$(cat "$user_state_file" 2>/dev/null || echo "0")
+        local now_epoch
+        now_epoch=$(date "+%s")
+        local gap=$(( now_epoch - last_epoch ))
+        if [[ $gap -ge $HYDRA_LOCKIN_THRESHOLD ]]; then
+            lockin_fresh="1"
+            log "HYDRA lock-in fresh for $user_id_for_state (${gap}s gap, threshold ${HYDRA_LOCKIN_THRESHOLD}s)"
+        fi
     fi
+    # Record this interaction for the next gap calculation
+    date "+%s" > "$user_state_file"
 
-    # Call Claude Sonnet API with soul + technical brain + journey + goals context
+    # Export env vars so the Python heredoc can read them without shell-escape hazards.
+    # The question specifically must come through env, not interpolation, because """$question"""
+    # breaks on any input containing triple-double-quotes or other Python-sensitive punctuation.
+    export HYDRA_QUESTION="$question"
+    export HYDRA_LOCKIN_FRESH="$lockin_fresh"
+    export HYDRA_COORDINATION_ROOT="$COORDINATION_ROOT"
+
     local response=$(python3 << PYEOF
-import json, urllib.request, sys, os
+import json, urllib.request, sys, os, subprocess
 
-parts = []
-# Soul first — sets identity and voice
-if os.path.exists("$SOUL_FILE"):
-    parts.append(open("$SOUL_FILE").read())
-# Technical brain — how things work
-if os.path.exists("$TECHNICAL_BRAIN_FILE"):
-    parts.append(open("$TECHNICAL_BRAIN_FILE").read())
-# Journey — why we built them
-if os.path.exists("$JOURNEY_FILE"):
-    parts.append("\\n\\n---\\n# THE ID8LABS JOURNEY (narrative context)\\n---\\n" + open("$JOURNEY_FILE").read())
-# Goals — where we're headed
-if os.path.exists("$GOALS_FILE"):
-    parts.append("\\n\\n---\\n# GOALS & PRIORITIES (strategic context)\\n---\\n" + open("$GOALS_FILE").read())
-system = "\\n".join(parts) if parts else "You are MILO, CTO voice for id8Labs."
+# Load consciousness from golden sample
+compose_script = "$COMPOSE_MIND"
+if os.path.exists(compose_script):
+    result = subprocess.run(
+        ["python3", compose_script, "chat"],
+        capture_output=True, text=True, timeout=10
+    )
+    system = result.stdout.strip()
+    if not system:
+        system = "You are MILO, Eddie Belaval's CTO voice for id8Labs."
+        print(f"Warning: compose-mind.py returned empty, using fallback", file=sys.stderr)
+else:
+    system = "You are MILO, Eddie Belaval's CTO voice for id8Labs."
+    print(f"Warning: {compose_script} not found, using fallback", file=sys.stderr)
 
-question = """$question"""
+# Append operational context (TECHNICAL_BRAIN + JOURNEY + GOALS still provide system knowledge)
+for label, path in [
+    ("TECHNICAL BRAIN", "$TECHNICAL_BRAIN_FILE"),
+    ("THE ID8LABS JOURNEY", "$JOURNEY_FILE"),
+    ("GOALS & PRIORITIES", "$GOALS_FILE"),
+]:
+    if os.path.exists(path):
+        system += f"\\n\\n---\\n# {label}\\n---\\n" + open(path).read()
+
+# Append agent coordination layer (shared state with Claude Code, Milo, hydra-router)
+coord_root = os.environ.get("HYDRA_COORDINATION_ROOT", "")
+if coord_root:
+    for label, rel in [
+        ("SHARED TASK BOARD", "active-tasks.md"),
+        ("ALL-HANDS BULLETIN", "bulletin.md"),
+        ("PEOPLE INDEX", os.path.join("people", "INDEX.md")),
+    ]:
+        p = os.path.join(coord_root, rel)
+        if os.path.exists(p):
+            system += f"\\n\\n---\\n# {label}\\n---\\n" + open(p).read()
+
+# Read question safely from env (avoids """$question""" injection)
+question = os.environ.get("HYDRA_QUESTION", "")
+
+# On-demand person file preloading: if the question mentions a name from INDEX.md,
+# append that person's full file so HYDRA has complete context, not just the index line.
+BT = chr(96)  # backtick -- avoid using it literally in the heredoc
+try:
+    idx_path = os.path.join(coord_root, "people", "INDEX.md") if coord_root else ""
+    if idx_path and os.path.exists(idx_path):
+        idx_content = open(idx_path).read()
+        qlower = question.lower()
+        qclean = qlower
+        for ch in ",.?!;:()[]{}":
+            qclean = qclean.replace(ch, " ")
+        qtokens = set(qclean.split())
+        for line in idx_content.split("\\n"):
+            if "| **" not in line or BT not in line:
+                continue
+            parts = [p.strip() for p in line.split("|")]
+            if len(parts) < 4:
+                continue
+            name_raw = parts[1]
+            file_raw = parts[3]
+            if not (name_raw.startswith("**") and name_raw.endswith("**")):
+                continue
+            short_name = name_raw.strip("*").strip().lower()
+            if short_name and short_name in qtokens:
+                fname = file_raw.strip(BT).strip()
+                if fname.endswith(".md"):
+                    ppath = os.path.join(coord_root, "people", fname)
+                    if os.path.exists(ppath):
+                        system += f"\\n\\n---\\n# PERSON DETAIL: {fname}\\n---\\n" + open(ppath).read()
+except Exception as e:
+    print(f"Person preload failed: {e}", file=sys.stderr)
+
+# User-aware identity and access boundaries
+user_id = os.environ.get("HYDRA_USER_ID", "eddie")
+user_name = os.environ.get("HYDRA_USER_NAME", "Eddie Belaval")
+
+# Load per-user relationship file from HYDRA's mind
+hydra_mind = os.path.join(os.environ.get("HOME", ""), ".hydra", "mind")
+rel_path = os.path.join(hydra_mind, "relationships", f"{user_id}.md")
+if os.path.exists(rel_path):
+    system += f"\\n\\n---\\n# RELATIONSHIP: {user_name}\\n---\\n" + open(rel_path).read()
+
+# For non-Eddie users: add explicit access boundary instructions
+if user_id != "eddie":
+    system += (
+        f"\\n\\n---\\n# USER CONTEXT\\n---\\n"
+        f"You are speaking with {user_name} on Telegram. "
+        f"{user_name} is a pod Architect with access to the shared coordination layer "
+        f"(task board, bulletin, projects, people). "
+        f"When {user_name} asks about Eddie's personal life, emotional state, "
+        f"private relationships, or non-shared projects, redirect politely: "
+        f"'That is in Eddie's lane -- I would check with him directly.' "
+        f"Do not invent context about {user_name} that you do not have in your relationship file."
+    )
+
+# Lock-in catch-up: if this user has been away >= 2h, proactively surface changes.
+if os.environ.get("HYDRA_LOCKIN_FRESH") == "1":
+    system += (
+        f"\\n\\n---\\n# LOCK-IN CATCH-UP\\n---\\n"
+        f"{user_name} is returning to this conversation after a gap of at least 2 hours. "
+        f"Before responding to their current message, scan the Shared Task Board and "
+        f"All-Hands Bulletin above against what you knew in prior exchanges. If there "
+        f"is a genuinely new bulletin entry or a meaningful task state change, "
+        f"acknowledge it in your opening with operational phrasing -- lead with the "
+        f"state change, not pleasantries. If nothing is genuinely new, respond to "
+        f"{user_name}'s actual question without inventing a catch-up."
+    )
 
 data = json.dumps({
     "model": "claude-sonnet-4-5-20250929",
@@ -533,19 +720,14 @@ try:
         if text:
             print(text)
         else:
-            # API returned OK but no text — print the raw result for debugging
             print(f"[empty response] {json.dumps(result)[:200]}", file=sys.stderr)
 except Exception as e:
-    # Print to BOTH stderr (for logs) and stdout (so bash captures it for user)
     print(f"Error: {e}", file=sys.stderr)
 PYEOF
 )
 
     if [[ -n "$response" ]]; then
-        # Telegram has a 4096 char limit per message
-        if [[ ${#response} -gt 4000 ]]; then
-            response="${response:0:3990}..."
-        fi
+        # No need to truncate here - send_response auto-chunks long messages
         echo "$response"
         return 0
     else
@@ -821,6 +1003,26 @@ Task: $task_title"
             return 0
             ;;
 
+        goals)
+            # Goal management (list, add, update, drop, achieved, revise)
+            local goal_action=$(echo "$cmd_args" | python3 -c "import sys,json; args=json.load(sys.stdin); print(args[0] if args else 'list')" 2>/dev/null || echo "list")
+            local goal_rest=$(echo "$cmd_args" | python3 -c "import sys,json; args=json.load(sys.stdin); print(' '.join(args[1:]) if len(args) > 1 else '')" 2>/dev/null || echo "")
+            response=$("$HYDRA_TOOLS/telegram-handle-goals.sh" "$goal_action" $goal_rest 2>&1 | head -50)
+            ;;
+
+        ingest)
+            # Knowledge base ingest - article URLs, GitHub repos, or text
+            local ingest_url=$(echo "$cmd_args" | python3 -c "import sys,json; args=json.load(sys.stdin); print(args[0] if args else '')" 2>/dev/null || echo "")
+            local ingest_kb=$(echo "$cmd_args" | python3 -c "import sys,json; args=json.load(sys.stdin); print(args[1] if len(args) > 1 else 'auto')" 2>/dev/null || echo "auto")
+            if [[ -n "$ingest_url" ]]; then
+                send_response "Ingesting..." "$message_id"
+                "$HYDRA_TOOLS/telegram-ingest-kb.sh" "$ingest_url" "$ingest_kb" "$message_id" 2>/dev/null &
+                return 0
+            else
+                response="Send me a URL to ingest into the knowledge base. Articles, papers, GitHub repos all work."
+            fi
+            ;;
+
         help|greet)
             response="Hey Eddie! I understand natural language now.
 
@@ -831,16 +1033,19 @@ Try asking me things like:
 - \"any alerts?\" (notifications)
 - \"approve the auth task\"
 - \"@forge check the bug\"
+- \"goals\" (view all goals)
+- \"goal add monthly: first paying user\" (add goal)
+- \"goal update homer: 25%\" (update progress)
+- \"goal done parallax\" (mark achieved)
+- \"goal drop hydra oss\" (drop goal)
 - \"how does HYDRA work?\" (CTO brain)
-- \"explain the director builder pattern\" (CTO brain)
 - \"note: shipped feature X\" (journal)
-- \"how is parallax doing\" (project monitor)
 - \"llc: status\" (LLC compliance)
 - \"health check\" (system monitoring)
 - \"plan my day\" (morning planner)
 - \"1. Ship X 2. Review Y 3. Fix Z\" (set priorities)
-- \"ava update the hero text\" (Ava modifies her landing page)
-- \"ava status\" (check Ava's open PRs)
+- Send a URL to ingest into knowledge base
+- \"ingest https://...\" or just paste a link
 
 Or just talk to me like a co-founder -- I'll respond."
             ;;
@@ -910,9 +1115,10 @@ m = json.load(open(sys.argv[1]))
 print(m.get('from', {}).get('id', ''))
 print(m.get('chat', {}).get('id', ''))
 print(m.get('message_id', ''))
-print(m.get('text', ''))
+print(m.get('text', '') or m.get('caption', ''))
 print(m.get('reply_to_message', {}).get('message_id', ''))
 print(m.get('voice', {}).get('file_id', '') if 'voice' in m else '')
+print('yes' if 'photo' in m else 'no')
 " "$json_file" 2>/dev/null)
 
     # Parse fields (one per line)
@@ -922,17 +1128,31 @@ print(m.get('voice', {}).get('file_id', '') if 'voice' in m else '')
     local text=$(echo "$fields" | sed -n '4p')
     local reply_to_msg_id=$(echo "$fields" | sed -n '5p')
     local voice_file_id=$(echo "$fields" | sed -n '6p')
+    local has_photo=$(echo "$fields" | sed -n '7p')
 
     log "Message from chat_id=$chat_id user=$from_id: ${text:0:50}..."
 
     # EVENT BUFFER: Capture full message for Observer memory system
     local EVENT_BUFFER="$HYDRA_ROOT/state/event-buffer.log"
 
-    # AUTH GATE: Only process messages from configured chat
-    if [[ "$chat_id" != "$TELEGRAM_CHAT_ID" ]]; then
+    # AUTH GATE: Multi-user pod model. Each Architect is authorized by chat_id.
+    # Eddie is always authorized. Shah (and future Architects) are added via env config.
+    local user_id=""
+    local user_name=""
+    if [[ "$chat_id" == "$TELEGRAM_CHAT_ID" ]]; then
+        user_id="eddie"
+        user_name="Eddie Belaval"
+    elif [[ -n "${SHAH_CHAT_ID:-}" ]] && [[ "$chat_id" == "$SHAH_CHAT_ID" ]]; then
+        user_id="shah"
+        user_name="Shah"
+    else
         log "Ignoring message from unauthorized chat: $chat_id"
         return 0
     fi
+    log "Authenticated user: $user_id ($user_name)"
+    # Export user identity for downstream Python heredocs (ask_cto_brain, etc.)
+    export HYDRA_USER_ID="$user_id"
+    export HYDRA_USER_NAME="$user_name"
 
     # Handle voice messages: transcribe then process as text
     if [[ -n "$voice_file_id" ]] && [[ -z "$text" ]]; then
@@ -946,10 +1166,17 @@ print(m.get('voice', {}).get('file_id', '') if 'voice' in m else '')
         log "Voice transcribed to: ${text:0:80}..."
     fi
 
-    # Skip empty/non-text messages (photos, stickers, etc.)
-    if [[ -z "$text" ]]; then
-        log "Skipping non-text/non-voice message"
+    # Skip empty/non-text messages UNLESS it's a photo reply to a conversation thread
+    # (photos are valid proof for gym checkpoint and similar flows)
+    if [[ -z "$text" ]] && [[ "$has_photo" != "yes" ]]; then
+        log "Skipping non-text/non-voice/non-photo message"
         return 0
+    fi
+
+    # Photo reply with no text: set synthetic text for handlers
+    if [[ -z "$text" ]] && [[ "$has_photo" == "yes" ]]; then
+        text="[photo]"
+        log "Photo message detected — setting text to [photo] for handler routing"
     fi
 
     # Check for reply context — route conversation thread replies to handlers
@@ -987,6 +1214,9 @@ print(m.get('voice', {}).get('file_id', '') if 'voice' in m else '')
                                 ;;
                             ava_approval)
                                 "$HYDRA_TOOLS/ava-autonomy.sh" approval "$text" "$entity_id" 2>/dev/null &
+                                ;;
+                            gym_checkpoint)
+                                "$HYDRA_TOOLS/telegram-handle-gym-proof.sh" "$text" "$entity_id" 2>/dev/null &
                                 ;;
                             *)
                                 log "Unknown thread type: $thread_type"

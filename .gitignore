@@ -17,9 +17,17 @@ reports/
 costs/
 logs/
 sessions/
+briefings/
+
+# Subproject build artifacts
+node_modules/
+dist/
+.venv/
+venv/
 
 # Python
 __pycache__/
+*.pyc
 
 # macOS
 .DS_Store

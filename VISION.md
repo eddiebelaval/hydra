@@ -1,5 +1,5 @@
 ---
-last-reconciled: 2026-03-18
+last-reconciled: 2026-04-13
 status: CURRENT
 ---
 
@@ -19,7 +19,7 @@ HYDRA exists to be the always-on nervous system: it watches the repos, tracks th
 
 ### 1. **Scheduled Coordination** -- REALIZED
 
-23+ launchd jobs orchestrate the daily rhythm: morning planner, daily briefing, evening review, heartbeats, observer, reflector, brain-updater, goals-updater, wellness daemon, memory guard. All bash, zero cost for scheduling.
+30+ launchd jobs orchestrate the daily rhythm: morning planner, daily briefing, evening review, heartbeats, observer, reflector, brain-updater, goals-updater, wellness daemon, memory guard, task-sweeper, task-bridge, project-staleness detector. 91 daemons audited Apr 13; 17 broken ones unloaded. All bash, zero cost for scheduling.
 
 ### 2. **CTO Voice** -- REALIZED
 
@@ -41,13 +41,29 @@ Event-driven morning flow (gym gate before terminal), weekday hydration/meal/mov
 
 Lateral agent coordination via SQLite-backed message board with channels (research, builds, health, coordination, ideas, revenue). Agents post findings, other agents read them. Threading via parent_id. Replaces hub-and-spoke with mesh pattern.
 
+### 9. **Runtime Engine** -- REALIZED
+
+Durable execution engine with agent delegation. rt_* tables in hydra.db, Python runtime layer. Job dependency graphs, fan-out/fan-in delegation, crash recovery via lease-based claims, CLI (hydra rt create/status/deps/resolve/tree). Integrated into agent heartbeat cycle with 30-sec readiness engine. Phase 1 (core engine) and Phase 2 (delegation loop) both shipped with integration tests.
+
+### 10. **Operational Hygiene** -- REALIZED
+
+Automated portfolio maintenance: task-sweeper (TTL-based task expiry), task-bridge (bidirectional HYDRA-MILO task sync), project-staleness detector (active/stale/dormant classification with Vercel deployment awareness). Observer and reflector extended with staleness signals for pattern detection on portfolio health.
+
 ### 7. **Mission Control Integration** -- PARTIAL
 
-HYDRA pushes heartbeat and observation signals to Mission Control's signals store. Morning planner reads MC signals for context. Missing: Bi-directional Telegram bridge, MC-driven priority suggestions, centralized signal routing through MC as single source of truth.
+**Shipped:** HYDRA pushes heartbeat and observation signals to MC's signals store (brain-updater, evening-review). Morning planner reads MC signals as Haiku context for daily priority suggestions. Shared repos.sh config with MC slug mapping. Signal TTL and auto-purge.
 
-### 8. **Open Source Release** -- UNREALIZED
+**Not yet implemented:**
+- Bi-directional Telegram bridge: MC sending commands/alerts back to Eddie through HYDRA's Telegram bot (currently HYDRA pushes to MC but MC cannot push back through Telegram).
+- MC-driven priority suggestions: MC autonomously surfacing priorities to HYDRA based on cross-product signal analysis (currently HYDRA reads raw signals; MC doesn't generate derived suggestions).
+- Centralized signal routing: All HYDRA signals flowing through MC as single source of truth rather than HYDRA maintaining parallel state in SQLite (currently both systems maintain independent state).
 
-Clean up scripts, write README, redact secrets, publish at github.com/eddiebelaval/hydra. Missing: Documentation, example configs, secret redaction pass, installation guide.
+### 8. **Open Source Release** -- PARTIAL
+
+**Shipped:** .gitignore excludes all secrets (config/*.env, hydra.db, state/, logs/). Example telegram.env.example with setup instructions. Example agents.yaml with full agent config documentation. init-db.sql with complete schema. README.md with installation guide and architecture overview.
+
+**Not yet implemented:**
+- Contribution guidelines and license.
 
 ## Phased Vision
 
@@ -61,7 +77,7 @@ Observational memory, behavioral pattern detection, CTO voice, goal tracking. HY
 
 ### Phase 3 -- Central Command Integration (In Progress)
 
-Wire all HYDRA signals through Mission Control. MC becomes the single source of truth. HYDRA reads from and writes to MC. Telegram bridge for bi-directional flow.
+Wire all HYDRA signals through Mission Control. MC becomes the single source of truth. HYDRA reads from and writes to MC. Telegram bridge for bi-directional flow. Runtime engine (Phase 1+2) shipped as the execution layer enabling agent delegation and durable workflows.
 
 ### Phase 4 -- Open Source
 

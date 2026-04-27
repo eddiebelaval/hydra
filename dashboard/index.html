@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HYDRA — Morning Dashboard</title>
+    <style>
+        :root {
+            --bg: #020202;
+            --surface: #0a0a0a;
+            --surface-2: #121212;
+            --border: #1a1a1a;
+            --border-hover: #2a2a2a;
+            --text: #eeeeee;
+            --text-dim: #888888;
+            --text-muted: #555555;
+            --orange: #ef6f2e;
+            --amber: #f59e0b;
+            --teal: #4ecdc4;
+            --green: #22c55e;
+            --red: #ef4444;
+            --blue: #3b82f6;
+            --purple: #a78bfa;
+            --font: 'Geist', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            --mono: 'Geist Mono', 'SF Mono', 'Fira Code', monospace;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+            font-weight: 400;
+            min-height: 100vh;
+        }
+
+        /* ── Layout ── */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 24px;
+        }
+
+        .header h1 {
+            font-size: 1.1rem;
+            font-weight: 400;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--text-dim);
+        }
+
+        .header h1 span { color: var(--orange); }
+
+        .header .meta {
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* ── Grid ── */
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .grid-full { grid-column: 1 / -1; }
+
+        /* ── Cards ── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .card:hover { border-color: var(--border-hover); }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .card-title {
+            font-size: 0.7rem;
+            font-weight: 400;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        .card-badge {
+            font-family: var(--mono);
+            font-size: 0.65rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: var(--surface-2);
+            color: var(--text-dim);
+        }
+
+        .card-badge.alert {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--red);
+        }
+
+        .card-badge.good {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--green);
+        }
+
+        .card-badge.warn {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--amber);
+        }
+
+        /* ── Priorities ── */
+        .priority-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .priority-item:last-child { border-bottom: none; }
+
+        .priority-num {
+            font-family: var(--mono);
+            font-size: 0.85rem;
+            color: var(--orange);
+            min-width: 20px;
+        }
+
+        .priority-text { font-size: 0.9rem; }
+
+        .priority-status {
+            margin-left: auto;
+            font-family: var(--mono);
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        .status-pending { background: rgba(245, 158, 11, 0.15); color: var(--amber); }
+        .status-done { background: rgba(34, 197, 94, 0.15); color: var(--green); }
+        .status-active { background: rgba(59, 130, 246, 0.15); color: var(--blue); }
+
+        .empty-state {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            font-style: italic;
+            padding: 8px 0;
+        }
+
+        /* ── Goals ── */
+        .goal-horizon { margin-bottom: 16px; }
+        .goal-horizon:last-child { margin-bottom: 0; }
+
+        .horizon-label {
+            font-family: var(--mono);
+            font-size: 0.65rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .goal-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 0;
+            font-size: 0.85rem;
+        }
+
+        .goal-progress {
+            width: 48px;
+            height: 4px;
+            background: var(--surface-2);
+            border-radius: 2px;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .goal-progress-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.3s;
+        }
+
+        .goal-desc { flex: 1; }
+        .goal-desc.achieved { color: var(--text-dim); text-decoration: line-through; }
+        .goal-desc.dropped { color: var(--text-muted); text-decoration: line-through; }
+
+        .goal-pct {
+            font-family: var(--mono);
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            min-width: 32px;
+            text-align: right;
+        }
+
+        .goal-category {
+            font-family: var(--mono);
+            font-size: 0.6rem;
+            padding: 1px 5px;
+            border-radius: 3px;
+            background: var(--surface-2);
+            color: var(--text-muted);
+        }
+
+        .cat-revenue { color: var(--green); background: rgba(34, 197, 94, 0.1); }
+        .cat-product { color: var(--blue); background: rgba(59, 130, 246, 0.1); }
+        .cat-growth { color: var(--purple); background: rgba(167, 139, 250, 0.1); }
+        .cat-ops { color: var(--amber); background: rgba(245, 158, 11, 0.1); }
+        .cat-personal { color: var(--teal); background: rgba(78, 205, 196, 0.1); }
+
+        /* ── Lookout Panels ── */
+        .lookout-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .lookout-panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .lookout-panel .horizon-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .lookout-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .dot-week { background: var(--teal); }
+        .dot-month { background: var(--blue); }
+        .dot-quarter { background: var(--orange); }
+
+        /* ── Agents ── */
+        .agent-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+        .agent-row:last-child { border-bottom: none; }
+
+        .agent-name {
+            font-family: var(--mono);
+            font-size: 0.8rem;
+            min-width: 60px;
+            color: var(--teal);
+        }
+
+        .agent-bar { flex: 1; display: flex; gap: 4px; align-items: center; }
+
+        .agent-segment { height: 16px; border-radius: 2px; min-width: 2px; }
+        .seg-pending { background: var(--amber); opacity: 0.7; }
+        .seg-wip { background: var(--blue); }
+        .seg-done { background: var(--green); opacity: 0.5; }
+
+        .agent-nums {
+            font-family: var(--mono);
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            min-width: 80px;
+            text-align: right;
+        }
+
+        /* ── Health ── */
+        .health-strip { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        .health-chip {
+            font-family: var(--mono);
+            font-size: 0.65rem;
+            padding: 3px 8px;
+            border-radius: 4px;
+            background: var(--surface-2);
+            color: var(--text-dim);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .health-dot { width: 5px; height: 5px; border-radius: 50%; }
+        .h-ok { background: var(--green); }
+        .h-warn { background: var(--amber); }
+        .h-crit { background: var(--red); }
+
+        /* ── Signals ── */
+        .signal-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            font-size: 0.85rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .signal-row:last-child { border-bottom: none; }
+        .signal-label { color: var(--text-dim); }
+        .signal-value { font-family: var(--mono); font-size: 0.85rem; }
+
+        /* ── Tasks ── */
+        .task-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 0;
+            font-size: 0.85rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .task-item:last-child { border-bottom: none; }
+
+        .task-agent {
+            font-family: var(--mono);
+            font-size: 0.7rem;
+            color: var(--teal);
+            min-width: 60px;
+        }
+        .task-title { flex: 1; }
+
+        .task-priority {
+            font-family: var(--mono);
+            font-size: 0.65rem;
+            padding: 1px 5px;
+            border-radius: 3px;
+        }
+        .p-1 { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+        .p-2 { background: rgba(245, 158, 11, 0.15); color: var(--amber); }
+
+        /* ── Activity ── */
+        .activity-block {
+            font-size: 0.85rem;
+            line-height: 1.7;
+            color: var(--text-dim);
+        }
+
+        /* ── Observations ── */
+        .obs-item {
+            padding: 6px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+        .obs-item:last-child { border-bottom: none; }
+
+        .obs-priority {
+            font-family: var(--mono);
+            font-size: 0.6rem;
+            padding: 1px 4px;
+            border-radius: 2px;
+            margin-right: 6px;
+        }
+        .obs-high { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+        .obs-moderate { background: rgba(245, 158, 11, 0.1); color: var(--amber); }
+        .obs-low { background: rgba(78, 205, 196, 0.1); color: var(--teal); }
+
+        /* ── Reflections ── */
+        .reflection-item {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            line-height: 1.6;
+        }
+        .reflection-item:last-child { border-bottom: none; }
+
+        /* ── Edit Mode ── */
+        .edit-btn {
+            font-family: var(--mono);
+            font-size: 0.65rem;
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .edit-btn:hover { border-color: var(--orange); color: var(--orange); }
+        .edit-btn.active { border-color: var(--orange); background: rgba(239, 111, 46, 0.1); color: var(--orange); }
+
+        .goal-edit-row {
+            display: none;
+            padding: 8px;
+            margin: 4px 0;
+            background: var(--surface-2);
+            border-radius: 6px;
+            gap: 8px;
+        }
+        .goal-edit-row.visible { display: flex; flex-wrap: wrap; }
+
+        .goal-edit-row input,
+        .goal-edit-row select {
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--surface);
+            color: var(--text);
+        }
+        .goal-edit-row input:focus,
+        .goal-edit-row select:focus { outline: none; border-color: var(--orange); }
+        .goal-edit-row input[type="range"] { accent-color: var(--orange); }
+
+        .save-btn {
+            font-family: var(--mono);
+            font-size: 0.7rem;
+            padding: 4px 12px;
+            border-radius: 4px;
+            border: 1px solid var(--green);
+            background: rgba(34, 197, 94, 0.1);
+            color: var(--green);
+            cursor: pointer;
+        }
+        .save-btn:hover { background: rgba(34, 197, 94, 0.2); }
+
+        .delete-btn {
+            font-family: var(--mono);
+            font-size: 0.7rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--red);
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--red);
+            cursor: pointer;
+        }
+
+        .add-goal-form {
+            display: none;
+            padding: 12px;
+            margin-top: 8px;
+            background: var(--surface-2);
+            border-radius: 6px;
+            gap: 8px;
+        }
+        .add-goal-form.visible { display: flex; flex-wrap: wrap; }
+
+        .add-goal-form input,
+        .add-goal-form select {
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--surface);
+            color: var(--text);
+            flex: 1;
+            min-width: 120px;
+        }
+
+        /* ── Footer ── */
+        .footer {
+            text-align: center;
+            padding: 24px 0 16px;
+            font-family: var(--mono);
+            font-size: 0.65rem;
+            color: var(--text-muted);
+        }
+
+        /* ── Toast ── */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            background: var(--surface);
+            border: 1px solid var(--green);
+            color: var(--green);
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.2s;
+            z-index: 100;
+        }
+        .toast.visible { opacity: 1; transform: translateY(0); }
+        .toast.error { border-color: var(--red); color: var(--red); }
+
+        @media (max-width: 800px) {
+            .grid { grid-template-columns: 1fr; }
+            .lookout-row { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><span>HYDRA</span> Morning Dashboard</h1>
+            <div class="meta">
+                <span id="date-display"></span> &middot; <span id="time-display"></span>
+            </div>
+        </div>
+
+        <!-- Today's Priorities -->
+        <div class="grid">
+            <div class="card grid-full">
+                <div class="card-header">
+                    <span class="card-title">Today's Priorities</span>
+                    <span class="card-badge" id="priority-badge"></span>
+                </div>
+                <div id="priorities-list"></div>
+            </div>
+        </div>
+
+        <!-- Lookout Panels -->
+        <div class="lookout-row">
+            <div class="lookout-panel">
+                <div class="horizon-label">
+                    <span class="lookout-dot dot-week"></span>
+                    <span>WEEKLY LOOKOUT</span>
+                    <span id="week-label" style="margin-left:auto;font-family:var(--mono);color:var(--teal);"></span>
+                </div>
+                <div id="weekly-content" style="margin-top:10px;"></div>
+            </div>
+            <div class="lookout-panel">
+                <div class="horizon-label">
+                    <span class="lookout-dot dot-month"></span>
+                    <span>MONTHLY LOOKOUT</span>
+                    <span id="month-label" style="margin-left:auto;font-family:var(--mono);color:var(--blue);"></span>
+                </div>
+                <div id="monthly-content" style="margin-top:10px;"></div>
+            </div>
+            <div class="lookout-panel">
+                <div class="horizon-label">
+                    <span class="lookout-dot dot-quarter"></span>
+                    <span>QUARTERLY LOOKOUT</span>
+                    <span id="quarter-label" style="margin-left:auto;font-family:var(--mono);color:var(--orange);"></span>
+                </div>
+                <div id="quarterly-content" style="margin-top:10px;"></div>
+            </div>
+        </div>
+
+        <!-- Goals -->
+        <div class="grid">
+            <div class="card grid-full">
+                <div class="card-header">
+                    <span class="card-title">Goals</span>
+                    <div style="display:flex;gap:6px;">
+                        <button class="edit-btn" id="add-goal-btn" onclick="toggleAddGoal()">+ add</button>
+                        <button class="edit-btn" id="edit-goals-btn" onclick="toggleEditMode()">edit</button>
+                    </div>
+                </div>
+                <div id="add-goal-form" class="add-goal-form">
+                    <select id="new-goal-horizon">
+                        <option value="quarterly">quarterly</option>
+                        <option value="monthly">monthly</option>
+                        <option value="weekly">weekly</option>
+                    </select>
+                    <input type="text" id="new-goal-desc" placeholder="Goal description" style="flex:3;">
+                    <select id="new-goal-category">
+                        <option value="product">product</option>
+                        <option value="revenue">revenue</option>
+                        <option value="growth">growth</option>
+                        <option value="ops">ops</option>
+                        <option value="personal">personal</option>
+                    </select>
+                    <button class="save-btn" onclick="addGoal()">add</button>
+                </div>
+                <div id="goals-list"></div>
+            </div>
+        </div>
+
+        <!-- Agents + Signals -->
+        <div class="grid">
+            <div class="card">
+                <div class="card-header"><span class="card-title">Agent Status</span></div>
+                <div id="agents-list"></div>
+            </div>
+            <div class="card">
+                <div class="card-header"><span class="card-title">Signals</span></div>
+                <div id="signals-list"></div>
+            </div>
+        </div>
+
+        <!-- Tasks -->
+        <div class="grid">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">High Priority Tasks</span>
+                    <span class="card-badge" id="tasks-badge"></span>
+                </div>
+                <div id="tasks-list"></div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Blocked</span>
+                    <span class="card-badge" id="blocked-badge"></span>
+                </div>
+                <div id="blocked-list"></div>
+            </div>
+        </div>
+
+        <!-- Activity + Yesterday -->
+        <div class="grid">
+            <div class="card">
+                <div class="card-header"><span class="card-title">Project Activity</span></div>
+                <div id="activity-content" class="activity-block"></div>
+            </div>
+            <div class="card">
+                <div class="card-header"><span class="card-title">Yesterday's Wins</span></div>
+                <div id="yesterday-list"></div>
+            </div>
+        </div>
+
+        <!-- Observations + Reflections -->
+        <div class="grid">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Recent Observations</span>
+                    <span class="card-badge" id="obs-badge"></span>
+                </div>
+                <div id="observations-list"></div>
+            </div>
+            <div class="card">
+                <div class="card-header"><span class="card-title">Reflections</span></div>
+                <div id="reflections-list"></div>
+            </div>
+        </div>
+
+        <!-- Health -->
+        <div class="grid">
+            <div class="card grid-full">
+                <div class="card-header">
+                    <span class="card-title">System Health</span>
+                    <span class="card-badge" id="health-badge"></span>
+                </div>
+                <div id="health-strip" class="health-strip"></div>
+            </div>
+        </div>
+
+        <div class="footer">
+            HYDRA Morning Dashboard &middot; Generated <span id="gen-time"></span>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+    /* ── State ── */
+    let DATA = null;
+    let editMode = false;
+    const API = 'http://localhost:7777';
+
+    /* ── Utility: safe text escaping ── */
+    const _escDiv = document.createElement('div');
+    function esc(s) {
+        if (!s) return '';
+        _escDiv.textContent = s;
+        return _escDiv.innerHTML;
+    }
+
+    function toast(msg, isError) {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.className = 'toast visible' + (isError ? ' error' : '');
+        setTimeout(function() { el.className = 'toast'; }, 2500);
+    }
+
+    /* ── Safe DOM builder helpers ── */
+    function el(tag, attrs, children) {
+        const node = document.createElement(tag);
+        if (attrs) {
+            Object.keys(attrs).forEach(function(k) {
+                if (k === 'className') node.className = attrs[k];
+                else if (k === 'style' && typeof attrs[k] === 'object') {
+                    Object.assign(node.style, attrs[k]);
+                } else if (k.startsWith('on')) {
+                    node.addEventListener(k.slice(2), attrs[k]);
+                } else node.setAttribute(k, attrs[k]);
+            });
+        }
+        if (children) {
+            if (typeof children === 'string') node.textContent = children;
+            else if (Array.isArray(children)) children.forEach(function(c) {
+                if (c) node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+            });
+            else node.appendChild(children);
+        }
+        return node;
+    }
+
+    /* ── Load Data ── */
+    async function loadData() {
+        try {
+            let resp;
+            try { resp = await fetch(API + '/api/data'); }
+            catch(e) { resp = await fetch('data.json'); }
+            DATA = await resp.json();
+            render();
+        } catch (e) {
+            var c = document.querySelector('.container');
+            c.textContent = '';
+            c.appendChild(el('div', {style:{textAlign:'center',padding:'80px',color:'var(--text-muted)'}}, [
+                el('p', null, 'Could not load dashboard data.'),
+                el('p', {style:{fontFamily:'var(--mono)',fontSize:'0.75rem',marginTop:'12px'}}, 'Run: ~/.hydra/dashboard/generate-data.sh')
+            ]));
+        }
+    }
+
+    /* ── Master Render ── */
+    function render() {
+        var d = DATA;
+        document.getElementById('date-display').textContent = d.day + ', ' + d.date;
+        document.getElementById('time-display').textContent = new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'});
+        document.getElementById('gen-time').textContent = new Date(d.generated_at).toLocaleString();
+
+        renderPriorities(d.priorities);
+        renderLookouts(d);
+        renderGoals(d.goals);
+        renderAgents(d.agents);
+        renderSignals(d.signals);
+        renderTasks(d.tasks);
+        renderActivity(d.project_activity);
+        renderYesterday(d.yesterday_wins);
+        renderObservations(d.observations);
+        renderReflections(d.reflections);
+        renderHealth(d.health);
+    }
+
+    /* ── Priorities ── */
+    function renderPriorities(priorities) {
+        var container = document.getElementById('priorities-list');
+        var badge = document.getElementById('priority-badge');
+        container.textContent = '';
+
+        if (!priorities || priorities.length === 0) {
+            badge.textContent = 'not set';
+            badge.className = 'card-badge warn';
+            container.appendChild(el('div', {className:'empty-state'}, 'Awaiting your input -- reply to the 8 AM Telegram prompt'));
+            return;
+        }
+        badge.textContent = priorities.length + ' set';
+        badge.className = 'card-badge good';
+        priorities.forEach(function(p) {
+            container.appendChild(el('div', {className:'priority-item'}, [
+                el('span', {className:'priority-num'}, String(p.num)),
+                el('span', {className:'priority-text'}, p.desc),
+                el('span', {className:'priority-status status-' + p.status}, p.status)
+            ]));
+        });
+    }
+
+    /* ── Lookout Panels ── */
+    function renderLookouts(d) {
+        // Weekly
+        document.getElementById('week-label').textContent = d.week;
+        var wc = document.getElementById('weekly-content');
+        wc.textContent = '';
+        var wf = d.weekly_focus;
+        if (wf && wf.theme) {
+            wc.appendChild(el('div', {style:{fontSize:'0.9rem',marginBottom:'8px',color:'var(--teal)'}}, wf.theme));
+            if (wf.items && wf.items.length) {
+                wf.items.forEach(function(i) {
+                    wc.appendChild(el('div', {className:'goal-item'}, [
+                        el('span', {style:{color:'var(--text-muted)'}}, '- '),
+                        el('span', {className:'goal-desc'}, i)
+                    ]));
+                });
+            }
+        } else {
+            wc.appendChild(el('div', {className:'empty-state'}, 'No weekly focus set'));
+        }
+
+        // Monthly
+        document.getElementById('month-label').textContent = d.month;
+        var mc = document.getElementById('monthly-content');
+        mc.textContent = '';
+        var monthGoals = (d.goals || []).filter(function(g) { return g.horizon === 'monthly' && g.status === 'active'; });
+        if (monthGoals.length) {
+            monthGoals.forEach(function(g) {
+                var bar = el('div', {className:'goal-progress'});
+                var fill = el('div', {className:'goal-progress-fill'});
+                fill.style.width = g.progress + '%';
+                fill.style.background = 'var(--blue)';
+                bar.appendChild(fill);
+                mc.appendChild(el('div', {className:'goal-item'}, [
+                    bar,
+                    el('span', {className:'goal-desc'}, g.description),
+                    el('span', {className:'goal-pct'}, g.progress + '%')
+                ]));
+            });
+        } else {
+            mc.appendChild(el('div', {className:'empty-state'}, 'No monthly goals set'));
+        }
+
+        // Quarterly
+        document.getElementById('quarter-label').textContent = d.quarter;
+        var qc = document.getElementById('quarterly-content');
+        qc.textContent = '';
+        var qGoals = (d.goals || []).filter(function(g) { return g.horizon === 'quarterly'; });
+        if (qGoals.length) {
+            var active = qGoals.filter(function(g) { return g.status === 'active'; });
+            var achieved = qGoals.filter(function(g) { return g.status === 'achieved'; });
+            var total = qGoals.length;
+            var avgProgress = Math.round(qGoals.reduce(function(s,g) { return s + g.progress; }, 0) / total);
+            qc.appendChild(el('div', {style:{fontSize:'0.85rem',color:'var(--text-dim)',marginBottom:'8px'}},
+                achieved.length + '/' + total + ' achieved \u00B7 avg ' + avgProgress + '%'));
+            active.slice(0, 4).forEach(function(g) {
+                var bar = el('div', {className:'goal-progress'});
+                var fill = el('div', {className:'goal-progress-fill'});
+                fill.style.width = g.progress + '%';
+                fill.style.background = 'var(--orange)';
+                bar.appendChild(fill);
+                qc.appendChild(el('div', {className:'goal-item'}, [
+                    bar,
+                    el('span', {className:'goal-desc'}, g.description),
+                    el('span', {className:'goal-pct'}, g.progress + '%')
+                ]));
+            });
+        } else {
+            qc.appendChild(el('div', {className:'empty-state'}, 'No quarterly goals'));
+        }
+    }
+
+    /* ── Goals (full view with edit) ── */
+    function renderGoals(goals) {
+        var container = document.getElementById('goals-list');
+        container.textContent = '';
+        if (!goals || goals.length === 0) {
+            container.appendChild(el('div', {className:'empty-state'}, 'No goals set'));
+            return;
+        }
+
+        var horizons = ['quarterly', 'monthly', 'weekly'];
+        var colors = { quarterly: 'var(--orange)', monthly: 'var(--blue)', weekly: 'var(--teal)' };
+
+        horizons.forEach(function(h) {
+            var hGoals = goals.filter(function(g) { return g.horizon === h; });
+            if (!hGoals.length) return;
+
+            var section = el('div', {className:'goal-horizon'});
+            var activeCount = hGoals.filter(function(g) { return g.status === 'active'; }).length;
+            section.appendChild(el('div', {className:'horizon-label'}, h.toUpperCase() + ' (' + activeCount + ' active)'));
+
+            hGoals.forEach(function(g) {
+                var wrapper = el('div');
+
+                // Goal row
+                var bar = el('div', {className:'goal-progress'});
+                var fill = el('div', {className:'goal-progress-fill'});
+                fill.style.width = g.progress + '%';
+                fill.style.background = colors[h];
+                bar.appendChild(fill);
+
+                var descClass = 'goal-desc';
+                if (g.status === 'achieved') descClass += ' achieved';
+                if (g.status === 'dropped') descClass += ' dropped';
+
+                var row = el('div', {className:'goal-item'}, [
+                    bar,
+                    el('span', {className:descClass}, g.description),
+                    el('span', {className:'goal-category cat-' + g.category}, g.category),
+                    el('span', {className:'goal-pct'}, g.progress + '%')
+                ]);
+
+                if (editMode) {
+                    row.style.cursor = 'pointer';
+                    (function(goalId) {
+                        row.addEventListener('click', function() { toggleGoalEdit(goalId); });
+                    })(g.id);
+                }
+                wrapper.appendChild(row);
+
+                // Edit row (hidden by default)
+                var editRow = el('div', {className:'goal-edit-row', id:'edit-' + g.id});
+                var rangeInput = el('input', {type:'range', min:'0', max:'100', value:String(g.progress), id:'prog-' + g.id, style:{flex:'2'}});
+                var rangeLabel = el('span', {id:'prog-val-' + g.id, style:{fontFamily:'var(--mono)',fontSize:'0.7rem',color:'var(--text-dim)',minWidth:'32px'}}, g.progress + '%');
+                rangeInput.addEventListener('input', (function(labelId) {
+                    return function(e) { document.getElementById(labelId).textContent = e.target.value + '%'; };
+                })('prog-val-' + g.id));
+
+                var statusSelect = el('select', {id:'status-' + g.id});
+                ['active','achieved','dropped','revised','carried'].forEach(function(s) {
+                    var opt = el('option', {value:s}, s);
+                    if (g.status === s) opt.selected = true;
+                    statusSelect.appendChild(opt);
+                });
+
+                var noteInput = el('input', {type:'text', id:'note-' + g.id, placeholder:'check-in note', style:{flex:'2'}});
+                var saveButton = el('button', {className:'save-btn'}, 'save');
+                (function(goalId) { saveButton.addEventListener('click', function() { saveGoal(goalId); }); })(g.id);
+                var dropButton = el('button', {className:'delete-btn'}, 'drop');
+                (function(goalId) { dropButton.addEventListener('click', function() { dropGoal(goalId); }); })(g.id);
+
+                editRow.appendChild(rangeInput);
+                editRow.appendChild(rangeLabel);
+                editRow.appendChild(statusSelect);
+                editRow.appendChild(noteInput);
+                editRow.appendChild(saveButton);
+                editRow.appendChild(dropButton);
+                wrapper.appendChild(editRow);
+
+                section.appendChild(wrapper);
+            });
+
+            container.appendChild(section);
+        });
+    }
+
+    /* ── Agents ── */
+    function renderAgents(agents) {
+        var container = document.getElementById('agents-list');
+        container.textContent = '';
+        if (!agents || agents.length === 0) {
+            container.appendChild(el('div', {className:'empty-state'}, 'No agents loaded'));
+            return;
+        }
+        var maxWork = Math.max.apply(null, agents.map(function(a) { return a.pending + a.wip + a.done_today; }).concat([1]));
+        agents.forEach(function(a) {
+            var scale = 120 / maxWork;
+            var barDiv = el('div', {className:'agent-bar'});
+            if (a.pending) {
+                var seg = el('div', {className:'agent-segment seg-pending', title:a.pending + ' pending'});
+                seg.style.width = (a.pending * scale) + 'px';
+                barDiv.appendChild(seg);
+            }
+            if (a.wip) {
+                var seg2 = el('div', {className:'agent-segment seg-wip', title:a.wip + ' in progress'});
+                seg2.style.width = (a.wip * scale) + 'px';
+                barDiv.appendChild(seg2);
+            }
+            if (a.done_today) {
+                var seg3 = el('div', {className:'agent-segment seg-done', title:a.done_today + ' done today'});
+                seg3.style.width = (a.done_today * scale) + 'px';
+                barDiv.appendChild(seg3);
+            }
+            container.appendChild(el('div', {className:'agent-row'}, [
+                el('span', {className:'agent-name'}, a.name),
+                barDiv,
+                el('span', {className:'agent-nums'}, a.pending + 'P / ' + a.wip + 'W / ' + a.done_today + 'D')
+            ]));
+        });
+    }
+
+    /* ── Signals ── */
+    function renderSignals(signals) {
+        var container = document.getElementById('signals-list');
+        container.textContent = '';
+        if (!signals || Object.keys(signals).length === 0) {
+            container.appendChild(el('div', {className:'empty-state'}, 'All systems nominal'));
+            return;
+        }
+        var labels = {
+            seventy_pct: '70% Projects',
+            marketing_streak: 'Marketing Streak',
+            focus_score: 'Focus Score'
+        };
+        Object.keys(signals).forEach(function(k) {
+            var v = signals[k];
+            var valNode;
+            if (k === 'focus_score') {
+                var color = v >= 70 ? 'var(--green)' : v >= 40 ? 'var(--amber)' : 'var(--red)';
+                valNode = el('span', {className:'signal-value', style:{color:color}}, v + '%');
+            } else if (k === 'marketing_streak') {
+                valNode = el('span', {className:'signal-value'}, v + ' days');
+            } else if (k === 'seventy_pct') {
+                valNode = el('span', {className:'signal-value'}, v + ' need finishing');
+            } else {
+                valNode = el('span', {className:'signal-value'}, String(v));
+            }
+            container.appendChild(el('div', {className:'signal-row'}, [
+                el('span', {className:'signal-label'}, labels[k] || k),
+                valNode
+            ]));
+        });
+    }
+
+    /* ── Tasks ── */
+    function renderTasks(tasks) {
+        var container = document.getElementById('tasks-list');
+        var badge = document.getElementById('tasks-badge');
+        var bcontainer = document.getElementById('blocked-list');
+        var bbadge = document.getElementById('blocked-badge');
+        container.textContent = '';
+        bcontainer.textContent = '';
+
+        if (!tasks) {
+            container.appendChild(el('div', {className:'empty-state'}, '--'));
+            bcontainer.appendChild(el('div', {className:'empty-state'}, '--'));
+            return;
+        }
+
+        var hp = tasks.high_priority || [];
+        badge.textContent = String(hp.length);
+        badge.className = 'card-badge' + (hp.length ? ' warn' : '');
+        if (hp.length) {
+            hp.forEach(function(t) {
+                container.appendChild(el('div', {className:'task-item'}, [
+                    el('span', {className:'task-agent'}, t.agent),
+                    el('span', {className:'task-title'}, t.title),
+                    el('span', {className:'task-priority p-' + t.priority}, 'P' + t.priority)
+                ]));
+            });
+        } else {
+            container.appendChild(el('div', {className:'empty-state'}, 'No high priority tasks'));
+        }
+
+        var bl = tasks.blocked || [];
+        bbadge.textContent = String(bl.length);
+        bbadge.className = 'card-badge' + (bl.length ? ' alert' : '');
+        if (bl.length) {
+            bl.forEach(function(t) {
+                bcontainer.appendChild(el('div', {className:'task-item'}, [
+                    el('span', {className:'task-agent'}, t.agent),
+                    el('span', {className:'task-title'}, t.title),
+                    el('span', {style:{fontSize:'0.7rem',color:'var(--red)'}}, t.reason || '')
+                ]));
+            });
+        } else {
+            bcontainer.appendChild(el('div', {className:'empty-state'}, 'Nothing blocked'));
+        }
+    }
+
+    /* ── Activity ── */
+    function renderActivity(text) {
+        var container = document.getElementById('activity-content');
+        container.textContent = '';
+        if (!text || !text.trim()) {
+            container.appendChild(el('div', {className:'empty-state'}, 'No recent activity'));
+            return;
+        }
+        // Parse markdown-ish activity into DOM nodes
+        var lines = text.split('\n');
+        lines.forEach(function(line) {
+            if (!line.trim()) {
+                container.appendChild(el('div', {style:{height:'6px'}}));
+                return;
+            }
+            var div = el('div', {style:{padding:'1px 0'}});
+            // Bold markers
+            var parts = line.split(/\*\*([^*]+)\*\*/g);
+            parts.forEach(function(part, i) {
+                if (i % 2 === 1) {
+                    div.appendChild(el('strong', {style:{color:'var(--text)',fontWeight:'500'}}, part));
+                } else {
+                    div.appendChild(document.createTextNode(part));
+                }
+            });
+            container.appendChild(div);
+        });
+    }
+
+    /* ── Yesterday ── */
+    function renderYesterday(wins) {
+        var container = document.getElementById('yesterday-list');
+        container.textContent = '';
+        if (!wins || wins.length === 0) {
+            container.appendChild(el('div', {className:'empty-state'}, 'No completions yesterday'));
+            return;
+        }
+        wins.forEach(function(w) {
+            container.appendChild(el('div', {className:'task-item'}, [
+                el('span', {className:'task-agent'}, w.agent),
+                el('span', {className:'task-title'}, w.title)
+            ]));
+        });
+    }
+
+    /* ── Observations ── */
+    function renderObservations(obs) {
+        var container = document.getElementById('observations-list');
+        var badge = document.getElementById('obs-badge');
+        container.textContent = '';
+
+        if (!obs || obs.length === 0) {
+            badge.textContent = '0';
+            container.appendChild(el('div', {className:'empty-state'}, 'No recent observations'));
+            return;
+        }
+        badge.textContent = String(obs.length);
+        var high = obs.filter(function(o) { return o.priority === 'high' || o.priority === 'critical'; });
+        badge.className = 'card-badge' + (high.length ? ' warn' : '');
+
+        obs.slice(0, 6).forEach(function(o) {
+            var text = o.content.length > 120 ? o.content.substring(0, 120) + '...' : o.content;
+            container.appendChild(el('div', {className:'obs-item'}, [
+                el('span', {className:'obs-priority obs-' + o.priority}, o.priority),
+                document.createTextNode(text)
+            ]));
+        });
+    }
+
+    /* ── Reflections ── */
+    function renderReflections(refs) {
+        var container = document.getElementById('reflections-list');
+        container.textContent = '';
+        if (!refs || refs.length === 0) {
+            container.appendChild(el('div', {className:'empty-state'}, 'No recent reflections'));
+            return;
+        }
+        refs.slice(0, 4).forEach(function(r) {
+            var text = r.pattern.length > 200 ? r.pattern.substring(0, 200) + '...' : r.pattern;
+            container.appendChild(el('div', {className:'reflection-item'}, [
+                el('span', {className:'obs-priority obs-' + r.priority}, r.priority),
+                document.createTextNode(' ' + text)
+            ]));
+        });
+    }
+
+    /* ── Health ── */
+    function renderHealth(health) {
+        var container = document.getElementById('health-strip');
+        var badge = document.getElementById('health-badge');
+        container.textContent = '';
+
+        if (!health || typeof health === 'string') {
+            badge.textContent = 'unknown';
+            container.appendChild(el('div', {className:'empty-state'}, 'Health data unavailable'));
+            return;
+        }
+
+        var statusClass = health.status === 'critical' ? 'alert' : health.status === 'warning' ? 'warn' : 'good';
+        badge.textContent = health.status;
+        badge.className = 'card-badge ' + statusClass;
+
+        (health.checks || []).forEach(function(c) {
+            var dotClass = c.status === 'OK' ? 'h-ok' : c.status === 'WARN' ? 'h-warn' : 'h-crit';
+            container.appendChild(el('div', {className:'health-chip', title:c.details}, [
+                el('div', {className:'health-dot ' + dotClass}),
+                document.createTextNode(c.component)
+            ]));
+        });
+    }
+
+    /* ── Edit Mode ── */
+    function toggleEditMode() {
+        editMode = !editMode;
+        document.getElementById('edit-goals-btn').classList.toggle('active', editMode);
+        renderGoals(DATA.goals);
+    }
+
+    function toggleGoalEdit(id) {
+        if (!editMode) return;
+        var row = document.getElementById('edit-' + id);
+        if (row) row.classList.toggle('visible');
+    }
+
+    function toggleAddGoal() {
+        document.getElementById('add-goal-form').classList.toggle('visible');
+    }
+
+    /* ── API Calls ── */
+    async function saveGoal(id) {
+        var progress = document.getElementById('prog-' + id).value;
+        var status = document.getElementById('status-' + id).value;
+        var note = document.getElementById('note-' + id).value;
+
+        try {
+            var resp = await fetch(API + '/api/goals/' + encodeURIComponent(id), {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ progress: parseInt(progress, 10), status: status, note: note })
+            });
+            if (!resp.ok) throw new Error(await resp.text());
+            toast('Goal updated');
+            var fresh = await fetch(API + '/api/data');
+            DATA = await fresh.json();
+            render();
+        } catch (e) {
+            toast('Failed: ' + e.message, true);
+        }
+    }
+
+    async function dropGoal(id) {
+        try {
+            var resp = await fetch(API + '/api/goals/' + encodeURIComponent(id), {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ status: 'dropped' })
+            });
+            if (!resp.ok) throw new Error(await resp.text());
+            toast('Goal dropped');
+            var fresh = await fetch(API + '/api/data');
+            DATA = await fresh.json();
+            render();
+        } catch (e) {
+            toast('Failed: ' + e.message, true);
+        }
+    }
+
+    async function addGoal() {
+        var horizon = document.getElementById('new-goal-horizon').value;
+        var desc = document.getElementById('new-goal-desc').value.trim();
+        var category = document.getElementById('new-goal-category').value;
+
+        if (!desc) { toast('Enter a description', true); return; }
+
+        var period = horizon === 'quarterly' ? DATA.quarter :
+                     horizon === 'monthly' ? DATA.month : DATA.week;
+
+        try {
+            var resp = await fetch(API + '/api/goals', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ horizon: horizon, period: period, description: desc, category: category })
+            });
+            if (!resp.ok) throw new Error(await resp.text());
+            toast('Goal added');
+            document.getElementById('new-goal-desc').value = '';
+            toggleAddGoal();
+            var fresh = await fetch(API + '/api/data');
+            DATA = await fresh.json();
+            render();
+        } catch (e) {
+            toast('Failed: ' + e.message, true);
+        }
+    }
+
+    /* ── Init ── */
+    loadData();
+    </script>
+</body>
+</html>

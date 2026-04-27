@@ -66,7 +66,8 @@ Available commands:
 - ava_status: Check status of Ava's open PRs and operations (ava status, how's ava's PR, what is ava doing, ava ops)
 - plan: Set daily priorities, morning planning, what should I focus on (plan my day, set priorities, what should I work on today, top 3, my priorities, planning) -> args should be priority text if provided e.g. ["1. Ship demo 2. Review PR 3. Homer auth"]
 - ask: Technical questions, architecture, code, how things work, the journey/story, history, strategy questions, opinions about projects, "what do you think about X", sharing findings that need a response (how does X work, explain Y, what should we do about Z, what do you think of this, look at this finding, tell me about the journey)
-- chat: Conversational messages, reactions, praise, casual talk, sharing news/updates, thinking out loud, following up on something, anything that doesn't fit another command but deserves a thoughtful response. This is a CATCH-ALL for anything conversational. Use this liberally. (nice work, that's awesome, we lost 50 bucks, check this out, I was thinking about X, fuck yeah, we should do X someday, look what I found)
+- ingest: Ingest an article, URL, or GitHub repo into the knowledge base. Triggered by: sending a URL with context like "save this", "ingest", "add to kb", "read this", "file this", "check this article", or just a bare URL that looks like an article/paper/repo to study. Args: first arg is the URL, second optional arg is KB name override (research/design). If no KB specified, auto-detect. (ingest https://example.com, save this https://arxiv.org/..., add to research https://..., https://github.com/user/repo check this out, file this https://blog.com/article)
+- chat: Conversational messages, reactions, praise, casual talk, sharing news/updates, thinking out loud, following up on something, anything that doesn't fit another command but deserves a thoughtful response. This is a CATCH-ALL for anything conversational. Use this liberally. (nice work, that's awesome, we lost 50 bucks, check this out WITHOUT a URL, I was thinking about X, fuck yeah, we should do X someday, look what I found WITHOUT a link)
 - greet: Short greetings and meta-questions ONLY (hey, hello, you there, we good). NOT longer messages that start with hey.
 - unknown: ONLY for truly incomprehensible or accidental messages (keyboard mash, single punctuation, totally garbled text). Almost never used.
 
@@ -265,6 +266,27 @@ User: what is ava doing
 
 User: how's ava's PR
 {"type": "ava_status", "args": [], "confidence": "high"}
+
+User: ingest https://arxiv.org/abs/2401.12345
+{"type": "ingest", "args": ["https://arxiv.org/abs/2401.12345"], "confidence": "high"}
+
+User: save this https://blog.example.com/great-article
+{"type": "ingest", "args": ["https://blog.example.com/great-article"], "confidence": "high"}
+
+User: https://github.com/anthropics/claude-code check this out
+{"type": "ingest", "args": ["https://github.com/anthropics/claude-code"], "confidence": "high"}
+
+User: add to research https://example.com/consciousness-paper
+{"type": "ingest", "args": ["https://example.com/consciousness-paper", "research"], "confidence": "high"}
+
+User: file this into design https://linear.app/design-system
+{"type": "ingest", "args": ["https://linear.app/design-system", "design"], "confidence": "high"}
+
+User: https://substack.com/interesting-article
+{"type": "ingest", "args": ["https://substack.com/interesting-article"], "confidence": "high"}
+
+User: read this https://news.ycombinator.com/item?id=12345
+{"type": "ingest", "args": ["https://news.ycombinator.com/item?id=12345"], "confidence": "high"}
 
 User: asdfghjk
 {"type": "unknown", "args": [], "confidence": "high"}"""
