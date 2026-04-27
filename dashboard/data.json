@@ -1,0 +1,373 @@
+{
+  "generated_at": "2026-04-27T10:00:05Z",
+  "date": "2026-04-27",
+  "day": "Monday",
+  "week": "2026-W18",
+  "month": "2026-04",
+  "quarter": "Q2-2026",
+  "priorities": [],
+  "goals": [
+    {
+      "id": "q1-homer",
+      "horizon": "quarterly",
+      "period": "Q1-2026",
+      "description": "Homer to 2-3 paying users",
+      "status": "active",
+      "progress": 10,
+      "category": "revenue",
+      "parent_id": null,
+      "notes": "Product-market fit and user onboarding. Homer is the flagship.",
+      "target_date": null
+    },
+    {
+      "id": "q1-rune",
+      "horizon": "quarterly",
+      "period": "Q1-2026",
+      "description": "Rune public launch",
+      "status": "active",
+      "progress": 80,
+      "category": "product",
+      "parent_id": null,
+      "notes": "PR #1 open, full build complete. Merge, deploy, Supabase setup.",
+      "target_date": null
+    },
+    {
+      "id": "q1-book",
+      "horizon": "quarterly",
+      "period": "Q1-2026",
+      "description": "Kobe & Emily Book Project",
+      "status": "active",
+      "progress": 15,
+      "category": "product",
+      "parent_id": null,
+      "notes": "Bicultural children's picture book pilot. 13-week roadmap Feb 20 - May 20.",
+      "target_date": null
+    },
+    {
+      "id": "q1-hydra-oss",
+      "horizon": "quarterly",
+      "period": "Q1-2026",
+      "description": "HYDRA open source",
+      "status": "active",
+      "progress": 20,
+      "category": "growth",
+      "parent_id": null,
+      "notes": "Prep for github.com/eddiebelaval/hydra -- clean up, README, redact secrets.",
+      "target_date": null
+    },
+    {
+      "id": "q1-artifacts",
+      "horizon": "quarterly",
+      "period": "Q1-2026",
+      "description": "Claude Code Artifacts growth",
+      "status": "active",
+      "progress": 80,
+      "category": "growth",
+      "parent_id": null,
+      "notes": "Cohort exploded to ~30 people for Claude architect certification exam",
+      "target_date": null
+    },
+    {
+      "id": "q1-content",
+      "horizon": "quarterly",
+      "period": "Q1-2026",
+      "description": "id8Labs content site",
+      "status": "active",
+      "progress": 15,
+      "category": "growth",
+      "parent_id": null,
+      "notes": "Regular articles at id8labs.app/writing/ -- building in public narrative.",
+      "target_date": null
+    },
+    {
+      "id": "q2-revenue",
+      "horizon": "quarterly",
+      "period": "Q2-2026",
+      "description": "First dollar of revenue from any product",
+      "status": "active",
+      "progress": 0,
+      "category": "revenue",
+      "parent_id": null,
+      "notes": "Carried from mar-revenue (2026-03-06). March period passed without conversion. Q2 keeps same intent; revenue paths are Parallax Pro conversion + Homer agent seat.",
+      "target_date": "2026-06-30"
+    },
+    {
+      "id": "q1-parallax",
+      "horizon": "quarterly",
+      "period": "Q1-2026",
+      "description": "Ship Parallax hackathon",
+      "status": "achieved",
+      "progress": 100,
+      "category": "product",
+      "parent_id": null,
+      "notes": "Demo + submit by Feb 16. LIVE at tryparallax.space with billing.",
+      "target_date": null
+    },
+    {
+      "id": "mar-homer-user",
+      "horizon": "monthly",
+      "period": "2026-03",
+      "description": "Get first paying Homer user",
+      "status": "active",
+      "progress": 40,
+      "category": "revenue",
+      "parent_id": "q1-homer",
+      "notes": "Gus agency meeting scheduled - dogfooding exchange for legal scaffolding help",
+      "target_date": null
+    },
+    {
+      "id": "mar-parallax-anna",
+      "horizon": "monthly",
+      "period": "2026-03",
+      "description": "Parallax: Anna onboarded as first customer",
+      "status": "active",
+      "progress": 60,
+      "category": "revenue",
+      "parent_id": "q1-parallax",
+      "notes": "Anna + friend's spouse (eager to use Parallax) both in onboarding pipeline",
+      "target_date": null
+    },
+    {
+      "id": "mar-rune-merge",
+      "horizon": "monthly",
+      "period": "2026-03",
+      "description": "Merge Rune PR #1 and deploy",
+      "status": "active",
+      "progress": 50,
+      "category": "product",
+      "parent_id": "q1-rune",
+      "notes": "Supabase setup remaining.",
+      "target_date": null
+    },
+    {
+      "id": "mar-revenue",
+      "horizon": "monthly",
+      "period": "2026-03",
+      "description": "First dollar of revenue from any product",
+      "status": "carried",
+      "progress": 0,
+      "category": "revenue",
+      "parent_id": "q1-homer",
+      "notes": "The inversion focus: ONE product, ONE segment, TEN users.",
+      "target_date": null
+    }
+  ],
+  "weekly_focus": {
+    "week": "2026-W18",
+    "theme": null,
+    "items": [],
+    "retro": null
+  },
+  "agents": [
+    {
+      "name": "MILO",
+      "pending": 3,
+      "wip": 0,
+      "done_today": 0
+    },
+    {
+      "name": "SCOUT",
+      "pending": 1,
+      "wip": 0,
+      "done_today": 0
+    },
+    {
+      "name": "AVA",
+      "pending": 0,
+      "wip": 0,
+      "done_today": 0
+    },
+    {
+      "name": "FORGE",
+      "pending": 0,
+      "wip": 0,
+      "done_today": 0
+    },
+    {
+      "name": "PULSE",
+      "pending": 0,
+      "wip": 0,
+      "done_today": 0
+    }
+  ],
+  "tasks": {
+    "high_priority": [
+      {
+        "agent": "milo",
+        "title": "Morning: Set your ONE thing",
+        "priority": 1,
+        "status": "pending",
+        "due": null
+      },
+      {
+        "agent": "scout",
+        "title": "MARKETING: Rebuild your streak",
+        "priority": 2,
+        "status": "pending",
+        "due": null
+      }
+    ],
+    "blocked": [],
+    "urgent_count": 2,
+    "notification_count": 2
+  },
+  "yesterday_wins": [],
+  "project_activity": "**Mission Control**\n- Shipped **flight-deck system living-review link** for enhanced documentation access\n- Executed **SQL migration strategy** (Option A) with PII remediation and audit scrubbing tasks\n- Wired **Homer execution layer** into master todo surface for task orchestration\n- Integrated **Golden Sample Plan 8-step sequence** into task management system\n- Added Gmail retrieval and audit tasks from Phase 3 planning work",
+  "signals": {
+    "marketing_streak": 0
+  },
+  "health": {
+    "status": "critical",
+    "checks": [
+      {
+        "check": "disk",
+        "component": "free_space",
+        "status": "CRIT",
+        "details": "10GB free (below 10GB threshold)"
+      },
+      {
+        "check": "memory",
+        "component": "pressure",
+        "status": "WARN",
+        "details": "76% used (27.6GB), 7.8GB free"
+      },
+      {
+        "check": "api",
+        "component": "anthropic",
+        "status": "OK",
+        "details": "Haiku ping successful"
+      },
+      {
+        "check": "db",
+        "component": "integrity",
+        "status": "OK",
+        "details": "PRAGMA integrity_check: ok"
+      },
+      {
+        "check": "db",
+        "component": "size",
+        "status": "OK",
+        "details": "15MB (limit: 1000MB)"
+      },
+      {
+        "check": "disk",
+        "component": "hydra_dir",
+        "status": "OK",
+        "details": "173MB (limit: 5000MB)"
+      },
+      {
+        "check": "event_buffer",
+        "component": "size",
+        "status": "OK",
+        "details": "No buffer file (normal if observer just ran)"
+      },
+      {
+        "check": "launchd",
+        "component": "all_jobs",
+        "status": "OK",
+        "details": "12/12 jobs loaded"
+      },
+      {
+        "check": "launchd",
+        "component": "telegram_listener",
+        "status": "OK",
+        "details": "Running (PID 36190)"
+      }
+    ]
+  },
+  "observations": [
+    {
+      "date": "2026-04-27",
+      "priority": "critical",
+      "content": "Five projects dormant 46-79 days: Pause (79d, deployed), Vox (76d), Speak2 (70d), parallax-mobile (57d), ejb.ventures (46d, deployed)",
+      "source": "system"
+    },
+    {
+      "date": "2026-04-27",
+      "priority": "moderate",
+      "content": "Two deployed projects stalled: Pause and ejb.ventures require attention/maintenance planning",
+      "source": "system"
+    },
+    {
+      "date": "2026-04-27",
+      "priority": "moderate",
+      "content": "Three non-deployed projects inactive: Vox, Speak2, parallax-mobile need status review or restart decision",
+      "source": "system"
+    },
+    {
+      "date": "2026-04-26",
+      "priority": "critical",
+      "content": "Five projects dormant 46-79 days: Pause (79d, deployed), Vox (76d), Speak2 (70d), parallax-mobile (57d), ejb.ventures (46d, deployed)",
+      "source": "system"
+    },
+    {
+      "date": "2026-04-26",
+      "priority": "critical",
+      "content": "Pause and ejb.ventures remain in production despite extended inactivity",
+      "source": "system"
+    },
+    {
+      "date": "2026-04-26",
+      "priority": "moderate",
+      "content": "Life Triad vision check-in sent to Eddie via life_vision_check_sent",
+      "source": "system"
+    },
+    {
+      "date": "2026-04-26",
+      "priority": "critical",
+      "content": "Life Triad vision check-in sent to Eddie via life_vision_check_sent",
+      "source": "system"
+    },
+    {
+      "date": "2026-04-26",
+      "priority": "moderate",
+      "content": "Life Triad vision check-in sent to Eddie",
+      "source": "system"
+    },
+    {
+      "date": "2026-04-26",
+      "priority": "critical",
+      "content": "Life Triad vision check-in sent to Eddie via life_vision_check_sent",
+      "source": "system"
+    },
+    {
+      "date": "2026-04-26",
+      "priority": "low",
+      "content": "Auto-refresh portfolio snapshot committed to Mission Control",
+      "source": "git"
+    }
+  ],
+  "reflections": [
+    {
+      "pattern": "MARA social media automation achieved breakthrough milestone: first live post published to X on 2026-03-27 after Google Ads dashboard merge (PR #44)\u2014marketing streak stuck at 0 days for 6 consecutive days (2026-03-21 to 2026-03-26) finally broken, validates multi-week automation investment",
+      "priority": "critical",
+      "start": "2026-03-21",
+      "end": "2026-03-28"
+    },
+    {
+      "pattern": "Q1 flagship products stalled in pre-launch holding pattern: Homer needs 2-3 paying users, Parallax hackathon at 29 PRs/136 commits nearing Feb 16 deadline, Rune PR #1 open with \"full build complete\" since 2026-03-21\u2014all three flagged critical for 7 consecutive days with no launch commits, suggests deployment/go-to-market blockers",
+      "priority": "critical",
+      "start": "2026-03-21",
+      "end": "2026-03-28"
+    },
+    {
+      "pattern": "System disk space degradation accelerating toward failure: 3GB (2026-03-21) \u2192 4GB (2026-03-22/2026-03-23) \u2192 5GB (2026-03-24) \u2192 11GB (2026-03-26) \u2192 16GB (2026-03-27)\u2014recovery pattern suggests external cleanup happened off-system between 2026-03-24 and 2026-03-26, but root cause (log rotation, temp file accumulation) remains unaddressed",
+      "priority": "critical",
+      "start": "2026-03-21",
+      "end": "2026-03-28"
+    },
+    {
+      "pattern": "MILO agent focus dysfunction becoming operational risk: 46% focus score flagged for 6 consecutive days (2026-03-21 to 2026-03-26) with standing order to \"set ONE thing\"\u2014persistent underperformance despite daily briefings suggests task prioritization system failure or goal definition problem",
+      "priority": "critical",
+      "start": "2026-03-21",
+      "end": "2026-03-28"
+    },
+    {
+      "pattern": "Portfolio automation infrastructure maturing: auto-refresh commits appearing daily 2026-03-23 (Dae bridge trading sync), 2026-03-27 (4 snapshot commits: 9254266, 1eaa453, c8d1aa3, 2b6785f)\u2014financial data pipeline stabilizing after self-healing system deployment",
+      "priority": "moderate",
+      "start": "2026-03-21",
+      "end": "2026-03-28"
+    }
+  ],
+  "checkins": []
+}

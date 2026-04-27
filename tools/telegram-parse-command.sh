@@ -207,6 +207,60 @@ if [[ "$NORMALIZED" =~ ^(how\ does|how\ do|what\ is|what\ are|what\ stack|explai
     exit 0
 fi
 
+# goals / goal commands
+# "goals" or "show goals" -> list goals
+if [[ "$NORMALIZED" == "goals" ]] || [[ "$NORMALIZED" == "show goals" ]] || [[ "$NORMALIZED" == "my goals" ]] || \
+   [[ "$NORMALIZED" =~ ^(what are my goals|where am i|how.*(goals|tracking|progress)) ]]; then
+    echo '{"type": "goals", "command": "goals", "args": ["list"], "raw": "'"$RAW_ESCAPED"'"}'
+    exit 0
+fi
+
+# "goal add <horizon>: <description>" or "new goal: <description>"
+if [[ "$NORMALIZED" =~ ^(goal add|new goal|add goal)[[:space:]]*(quarterly|monthly|weekly)?[[:space:]]*:?[[:space:]]*(.*) ]]; then
+    GHORIZON="${BASH_REMATCH[2]:-monthly}"
+    GDESC="${BASH_REMATCH[3]}"
+    GDESC_ESCAPED=$(json_escape "$GDESC")
+    echo '{"type": "goals", "command": "goals", "args": ["add", "'"$GHORIZON"'", "'"$GDESC_ESCAPED"'"], "raw": "'"$RAW_ESCAPED"'"}'
+    exit 0
+fi
+
+# "goal update <keyword>: <progress>% [note]" or "goal <keyword> = <progress>%"
+if [[ "$NORMALIZED" =~ ^goal[[:space:]]+(update|set|progress)[[:space:]]+(.*)[[:space:]]*[:=][[:space:]]*([0-9]+)%?(.*)$ ]]; then
+    GKEYWORD="${BASH_REMATCH[2]}"
+    GPROGRESS="${BASH_REMATCH[3]}"
+    GNOTE="${BASH_REMATCH[4]}"
+    GKEYWORD_ESCAPED=$(json_escape "$GKEYWORD")
+    GNOTE_ESCAPED=$(json_escape "$(echo "$GNOTE" | sed 's/^[[:space:]]*//')")
+    echo '{"type": "goals", "command": "goals", "args": ["update", "'"$GKEYWORD_ESCAPED"'", "'"$GPROGRESS"'", "'"$GNOTE_ESCAPED"'"], "raw": "'"$RAW_ESCAPED"'"}'
+    exit 0
+fi
+
+# "goal drop <keyword>" or "drop goal <keyword>"
+if [[ "$NORMALIZED" =~ ^(goal drop|drop goal)[[:space:]]+(.*) ]]; then
+    GKEYWORD="${BASH_REMATCH[2]}"
+    GKEYWORD_ESCAPED=$(json_escape "$GKEYWORD")
+    echo '{"type": "goals", "command": "goals", "args": ["drop", "'"$GKEYWORD_ESCAPED"'"], "raw": "'"$RAW_ESCAPED"'"}'
+    exit 0
+fi
+
+# "goal done <keyword>" or "achieved <keyword>"
+if [[ "$NORMALIZED" =~ ^(goal done|goal achieved|achieved|goal complete)[[:space:]]+(.*) ]]; then
+    GKEYWORD="${BASH_REMATCH[2]}"
+    GKEYWORD_ESCAPED=$(json_escape "$GKEYWORD")
+    echo '{"type": "goals", "command": "goals", "args": ["achieved", "'"$GKEYWORD_ESCAPED"'"], "raw": "'"$RAW_ESCAPED"'"}'
+    exit 0
+fi
+
+# "goal change <keyword>: <new description>"
+if [[ "$NORMALIZED" =~ ^goal[[:space:]]+(change|revise|rename)[[:space:]]+(.*)[[:space:]]*[:>-]+[[:space:]]*(.*) ]]; then
+    GOLD="${BASH_REMATCH[2]}"
+    GNEW="${BASH_REMATCH[3]}"
+    GOLD_ESCAPED=$(json_escape "$GOLD")
+    GNEW_ESCAPED=$(json_escape "$GNEW")
+    echo '{"type": "goals", "command": "goals", "args": ["revise", "'"$GOLD_ESCAPED"'", "'"$GNEW_ESCAPED"'"], "raw": "'"$RAW_ESCAPED"'"}'
+    exit 0
+fi
+
 # Unknown command
 echo '{"type": "unknown", "command": null, "args": [], "raw": "'"$RAW_ESCAPED"'"}'
 exit 0

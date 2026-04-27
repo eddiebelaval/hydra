@@ -8,6 +8,7 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import Database from 'better-sqlite3'
+import { findSupersessionTarget } from './supersede.js'
 
 const DB_PATH = process.env.HYDRA_DB || `${process.env.HOME}/.hydra/hydra.db`
 const TRIVIAL = /^(ok|yes|no|thanks|cool|got it|sure|yep|nah|k|lol|haha|nice)$/i
@@ -110,16 +111,28 @@ async function main() {
   const db = new Database(DB_PATH, { readonly: false })
 
   try {
-    // Save memories (with basic dedup)
+    // Save memories with supersession-based dedup (see supersede.ts).
     for (const mem of extraction.memories) {
-      const existing = db.prepare(
-        'SELECT id FROM milo_memories WHERE content LIKE ? AND superseded_by IS NULL'
-      ).get(`%${mem.content.substring(0, 30)}%`)
+      const incoming = {
+        content: mem.content,
+        category: mem.category,
+        domain: mem.domain || null,
+        importance: mem.importance
+      }
+      // Find target BEFORE inserting so we don't match the new row.
+      const targetId = findSupersessionTarget(db, incoming)
+      const targetImportance = targetId !== null
+        ? (db.prepare('SELECT importance FROM milo_memories WHERE id = ?').get(targetId) as { importance: number } | undefined)?.importance ?? incoming.importance
+        : incoming.importance
+      const finalImportance = Math.max(incoming.importance, targetImportance)
 
-      if (!existing) {
-        db.prepare('INSERT INTO milo_memories (content, category, importance, domain) VALUES (?, ?, ?, ?)').run(
-          mem.content, mem.category, mem.importance, mem.domain || null
-        )
+      const info = db.prepare(
+        'INSERT INTO milo_memories (content, category, importance, domain) VALUES (?, ?, ?, ?)'
+      ).run(incoming.content, incoming.category, finalImportance, incoming.domain)
+      const newId = info.lastInsertRowid as number
+
+      if (targetId !== null) {
+        db.prepare('UPDATE milo_memories SET superseded_by = ?, updated_at = datetime(\'now\') WHERE id = ?').run(newId, targetId)
       }
     }
 

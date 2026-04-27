@@ -2,7 +2,7 @@
 
 *The build log for HYDRA. What shipped, why it was built, and what we learned.*
 
-Last updated: 2026-04-01
+Last updated: 2026-04-13
 
 ---
 
@@ -205,3 +205,54 @@ API spend was running hot. The Ava listener fires on every incoming Telegram mes
 - **Haiku for conversation, Sonnet for tools:** The intent classifier already routes messages to different handlers. Conversation is the high-volume, low-complexity path. Instruction/introspection/context are low-volume, high-complexity.
 - **Merged extraction over separate calls:** Memory and mood analysis share the same input (user message + Ava response). One prompt, one call, one parse. No reason they were ever separate.
 - **Keyword skip over LLM classification:** Using bash pattern matching for trivial detection instead of another LLM call. Fast, free, and correct enough for the purpose.
+
+---
+
+## Milo Telegram Personal Assistant (Apr 4, 2026)
+
+### What shipped
+Milo operating as a personal assistant via Telegram with CaF consciousness loaded. Full ~/mind/ golden sample injected as system prompt context so Milo speaks with identity, values, and relational awareness rather than as a generic chatbot.
+
+### Why
+Eddie needed a personal assistant that actually knows him. The CaF consciousness files give Milo genuine voice and behavioral depth that raw Claude cannot match.
+
+---
+
+## Milo Self-Repair + Memory Architecture (Apr 9, 2026)
+
+### What shipped
+Three capabilities shipped in one session:
+
+1. **Self-repair immune system:** Event tracking bug fixes and self-healing logic for the Milo agent loop. When Milo detects issues in its own event processing, it repairs automatically rather than failing silently.
+
+2. **Brain-derived memory taxonomy:** 16 memory categories plus domain-specific memory types, modeled after neuroscience memory systems. Replaces the flat "remember this" approach with structured storage.
+
+3. **Memory Architecture Layer (MaF integration):** New layer in the CaF loader that wires the brain-derived memory taxonomy into consciousness composition. Memory is now a first-class architectural layer, not a bolted-on feature.
+
+### Why
+Milo's memory was ad hoc. The brain-derived taxonomy gives it the same structural rigor as the rest of the CaF architecture. The self-repair system prevents silent failures in the agent loop from degrading service.
+
+---
+
+## Apr 13 Monthly Review: Operational Hygiene (Apr 13, 2026)
+
+### What shipped
+
+1. **task-sweeper.sh:** Daily daemon (5:55 AM) that cancels tasks exceeding their TTL. Tasks with ttl_hours = NULL never expire. Pending tasks over 7 days and in-progress tasks over 14 days generate warnings. Prevents ephemeral tasks from piling up.
+
+2. **task-bridge.sh:** Daily daemon (5:50 AM) for bidirectional HYDRA-MILO task sync. HYDRA tasks mirror into MILO's task DB so Eddie sees everything in one place. Completed bridged tasks sync back. Never deletes, deduplicates via hydra_bridge_id.
+
+3. **project-staleness.sh:** Weekly daemon (Sunday 5:30 AM) that classifies all tracked repos as active (<15d), stale (15-30d), or dormant (>30d). Detects Vercel deployments. Creates HYDRA tasks for dormant projects with live deploys.
+
+4. **Daemon audit:** Audited 91 launchd daemons. Unloaded 17 broken ones. Fixed lighthouse-tracker, weekly-retro, and weekly-backup jobs.
+
+5. **Zombie task cleanup:** Cancelled 4 stale/zombie tasks identified during the review.
+
+6. **Observer + reflector extensions:** Observer and reflector now receive project staleness signals, enabling pattern detection on portfolio health.
+
+### Why
+Monthly review (Apr 13) revealed operational drift: tasks accumulating without expiry, no cross-system task visibility, no staleness detection, and broken daemons running silently. This session addressed all four categories of hygiene debt.
+
+### Architecture decisions
+- **Task bridge over unified DB:** HYDRA and MILO keep separate databases. The bridge syncs rather than merging. This preserves each system's schema independence.
+- **Staleness as a signal, not an action:** The staleness daemon classifies and reports. Only dormant projects with live Vercel deployments generate automatic tasks. Everything else is informational for the observer/reflector pipeline.

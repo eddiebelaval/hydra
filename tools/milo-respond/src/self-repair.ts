@@ -15,6 +15,7 @@
  */
 
 import Database from 'better-sqlite3'
+import { findSupersessionTarget } from './supersede.js'
 
 // ============================================================================
 // TYPES (Golden Sample Contract)
@@ -110,37 +111,38 @@ function detectDuplicateEvents(db: Database.Database): RepairDetection[] {
 function detectDuplicateMemories(db: Database.Database): RepairDetection[] {
   const detections: RepairDetection[] = []
 
-  // Group by first 40 chars of content (normalized)
+  // Walk memories newest-first; for each, ask the shared supersession policy
+  // whether any older memory would supersede it under findSupersessionTarget.
+  // Single source of truth: write-time check and repair-time scan agree on "dup."
   const memories = db.prepare(`
-    SELECT id, content, category, importance, created_at
+    SELECT id, content, category, domain, importance, created_at
     FROM milo_memories
     WHERE superseded_by IS NULL
-    ORDER BY created_at ASC
-  `).all() as Array<{ id: number; content: string; category: string; importance: number; created_at: string }>
+    ORDER BY created_at DESC, id DESC
+  `).all() as Array<{ id: number; content: string; category: string; domain: string | null; importance: number; created_at: string }>
 
-  const seen = new Map<string, Array<{ id: number; content: string; created_at: string }>>()
+  const flaggedForSupersession = new Set<number>()
 
   for (const m of memories) {
-    const key = m.content.substring(0, 40).toLowerCase().trim()
-    if (!seen.has(key)) {
-      seen.set(key, [])
-    }
-    seen.get(key)!.push({ id: m.id, content: m.content, created_at: m.created_at })
-  }
-
-  for (const [, group] of seen) {
-    if (group.length > 1) {
-      // Keep the newest (last in array since sorted by created_at ASC)
-      const newest = group[group.length - 1]
-      const dupes = group.slice(0, -1)
-
+    if (flaggedForSupersession.has(m.id)) continue
+    // Temporarily exclude the row itself from the candidate pool by masking it
+    // as superseded, running the check, then unmasking.
+    db.prepare('UPDATE milo_memories SET superseded_by = -1 WHERE id = ?').run(m.id)
+    const targetId = findSupersessionTarget(db, { content: m.content, category: m.category, domain: m.domain, importance: m.importance })
+    db.prepare('UPDATE milo_memories SET superseded_by = NULL WHERE id = ?').run(m.id)
+    // Only accept a target that is strictly older than m. If the Jaccard match
+    // found a newer row, that means we're iterating in the wrong direction
+    // relative to this pair — skip it now; we'll handle it when we reach the
+    // newer row later in the loop.
+    if (targetId !== null && targetId !== m.id && targetId < m.id) {
+      flaggedForSupersession.add(targetId)
       detections.push({
         entity_type: 'memory',
-        entity_id: newest.id,
+        entity_id: m.id,
         issue_type: 'duplicate',
-        confidence: 0.9,
-        description: `${group.length} near-duplicate memories (first 40 chars match): "${newest.content.substring(0, 50)}..."`,
-        related_ids: dupes.map(d => d.id),
+        confidence: 0.95,
+        description: `Near-duplicate of memory ${targetId}: "${m.content.substring(0, 50)}..."`,
+        related_ids: [targetId],
       })
     }
   }
@@ -238,8 +240,9 @@ function detectOrphanedGoals(db: Database.Database): RepairDetection[] {
 function isSafeRepairType(d: RepairDetection): boolean {
   // Safe: archiving older duplicate events/tasks (keeps newest)
   // Safe: completing stale events 7+ days past
-  // NOT safe: touching memories, goals, strategies
+  // Safe: superseding duplicate memories (reversible via superseded_by, nothing deleted)
   if (d.issue_type === 'duplicate' && (d.entity_type === 'event' || d.entity_type === 'task')) return true
+  if (d.issue_type === 'duplicate' && d.entity_type === 'memory') return true
   if (d.issue_type === 'stale' && d.entity_type === 'event' && d.confidence >= 0.9) return true
   return false
 }
@@ -292,12 +295,24 @@ function repairStaleEvent(db: Database.Database, detection: RepairDetection): st
   return `Auto-completed stale event: ${detection.description}`
 }
 
+function repairDuplicateMemories(db: Database.Database, detection: RepairDetection): string {
+  // detection.entity_id = the newer memory (survivor)
+  // detection.related_ids[0] = the older memory (target to be superseded)
+  const targetId = detection.related_ids[0]
+  db.prepare(`UPDATE milo_memories SET superseded_by = ?, updated_at = datetime('now') WHERE id = ? AND superseded_by IS NULL`)
+    .run(Number(detection.entity_id), Number(targetId))
+  return `Superseded memory ${targetId} by ${detection.entity_id}`
+}
+
 function performRepair(db: Database.Database, detection: RepairDetection): string {
   if (detection.issue_type === 'duplicate' && detection.entity_type === 'event') {
     return repairDuplicateEvents(db, detection)
   }
   if (detection.issue_type === 'duplicate' && detection.entity_type === 'task') {
     return repairDuplicateTasks(db, detection)
+  }
+  if (detection.issue_type === 'duplicate' && detection.entity_type === 'memory') {
+    return repairDuplicateMemories(db, detection)
   }
   if (detection.issue_type === 'stale' && detection.entity_type === 'event') {
     return repairStaleEvent(db, detection)

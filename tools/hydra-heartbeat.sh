@@ -84,9 +84,9 @@ record_check() {
         local should_alert="true"
         if [[ -n "$last_alert" ]]; then
             local hours_since=$(python3 -c "
-from datetime import datetime
+from datetime import datetime, timezone
 last = datetime.strptime('$last_alert', '%Y-%m-%d %H:%M:%S')
-now = datetime.now()
+now = datetime.now(timezone.utc).replace(tzinfo=None)
 print((now - last).total_seconds() / 3600)
 " 2>/dev/null || echo "999")
             if python3 -c "exit(0 if float('$hours_since') < 2 else 1)" 2>/dev/null; then
@@ -127,6 +127,7 @@ check_launchd() {
         "com.hydra.morning-planner"
         "com.hydra.evening-review"
         "com.hydra.heartbeat"
+        "com.hydra.memory-guard"
     )
 
     local loaded_jobs=$(launchctl list 2>/dev/null | grep "com.hydra" | awk '{print $3}')

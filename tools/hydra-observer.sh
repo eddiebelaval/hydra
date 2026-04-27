@@ -188,6 +188,24 @@ $GIT_EVENTS
 "
 fi
 
+# --- Source 2b: Project Staleness (from staleness table) ---
+
+STALENESS_SIGNAL=$(sqlite3 "$HYDRA_DB" "
+    SELECT repo_name || ': ' || days_since_commit || 'd (' || status || CASE WHEN has_vercel THEN ', deployed' ELSE '' END || ')'
+    FROM project_staleness
+    WHERE days_since_commit > 14
+    ORDER BY days_since_commit DESC
+    LIMIT 5;
+" 2>/dev/null || echo "")
+
+if [[ -n "$STALENESS_SIGNAL" ]]; then
+    ALL_EVENTS+="## Stale Projects (>14 days)
+$STALENESS_SIGNAL
+
+"
+    log "Staleness: $(echo "$STALENESS_SIGNAL" | wc -l | tr -d ' ') stale projects"
+fi
+
 # --- Source 3: Today's Briefing (if not yet observed) ---
 
 BRIEFING_FILE="$HYDRA_ROOT/briefings/briefing-${DATE}.md"

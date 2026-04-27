@@ -57,7 +57,8 @@ HYDRA_DB="$HYDRA_ROOT/hydra.db"
 STATE_DIR="$HYDRA_ROOT/state"
 OFFSET_FILE="$STATE_DIR/milo-telegram-offset.txt"
 SESSION_FILE="$STATE_DIR/milo-session-id.txt"
-RESPONDER="$HYDRA_ROOT/tools/milo-respond"
+RESPONDER="$HYDRA_ROOT/tools/hydra-router"
+MILO_RESPOND="$HYDRA_ROOT/tools/milo-respond"
 
 LOG_DIR="$HOME/Library/Logs/claude-automation/milo-telegram"
 LOG_FILE="$LOG_DIR/listener-$(date +%Y-%m-%d).log"
@@ -84,8 +85,14 @@ ERROR_BACKOFF_BASE=5
 ERROR_BACKOFF_MAX=300
 CURRENT_BACKOFF=0
 
-# Session timeout (4 hours default)
+# Session timeout (4 hours default) -- controls session_id rotation
 SESSION_TIMEOUT="${MILO_SESSION_TIMEOUT:-14400}"
+
+# Lock-in threshold (2 hours default) -- triggers proactive catch-up surfacing
+# in Milo's response when Eddie returns after being away this long. Distinct
+# from SESSION_TIMEOUT: lock-in fires more often than session rotation so
+# lunch-break gaps get catch-up without rotating the conversation.
+MILO_LOCKIN_THRESHOLD="${MILO_LOCKIN_THRESHOLD:-7200}"
 
 mkdir -p "$LOG_DIR" "$STATE_DIR"
 
@@ -251,6 +258,25 @@ process_message() {
     local session_id
     session_id=$(get_session_id)
 
+    # Lock-in freshness check: if Eddie has been away from this chat for
+    # >= MILO_LOCKIN_THRESHOLD seconds (based on his last user-role turn),
+    # pass --lockin-fresh so Milo proactively surfaces new bulletin entries
+    # and task changes on the opening. This is separate from session rotation.
+    local lockin_flag=""
+    local last_user_turn
+    last_user_turn=$(sqlite3 "$HYDRA_DB" "SELECT MAX(created_at) FROM milo_conversations WHERE role='user';" 2>/dev/null || echo "")
+    if [[ -n "$last_user_turn" ]]; then
+        local last_user_epoch
+        last_user_epoch=$(date -j -f "%Y-%m-%d %H:%M:%S" "$last_user_turn" "+%s" 2>/dev/null || echo "0")
+        local now_epoch
+        now_epoch=$(date "+%s")
+        local user_gap=$(( now_epoch - last_user_epoch ))
+        if [[ $user_gap -ge $MILO_LOCKIN_THRESHOLD ]]; then
+            lockin_flag="--lockin-fresh"
+            log "Lock-in fresh (${user_gap}s gap, threshold ${MILO_LOCKIN_THRESHOLD}s)"
+        fi
+    fi
+
     # Write message to temp file for safe passing (avoids shell escaping issues)
     local msg_tmp
     msg_tmp=$(mktemp)
@@ -263,6 +289,7 @@ process_message() {
         --message "$(cat "$msg_tmp")" \
         --message-id "$message_id" \
         --session-id "$session_id" \
+        $lockin_flag \
         >"$resp_tmp" 2>>"$LOG_FILE"; then
 
         response=$(cat "$resp_tmp")
@@ -278,13 +305,13 @@ process_message() {
         log "Sent response (${#response} chars)"
 
         # Async: extract memories + mood (non-blocking)
-        (cd "$RESPONDER" && node --import tsx/esm src/extract-memories.ts \
+        (cd "$MILO_RESPOND" && node --import tsx/esm src/extract-memories.ts \
             --user-message "$(cat "$msg_tmp")" \
             --assistant-message "$response" \
             2>>"$LOG_FILE") &
 
         # Async: check if summarization needed
-        (cd "$RESPONDER" && node --import tsx/esm src/summarize.ts 2>>"$LOG_FILE") &
+        (cd "$MILO_RESPOND" && node --import tsx/esm src/summarize.ts 2>>"$LOG_FILE") &
     else
         log_error "Empty response from responder"
     fi

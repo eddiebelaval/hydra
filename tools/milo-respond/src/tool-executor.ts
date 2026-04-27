@@ -7,6 +7,7 @@
 
 import Database from 'better-sqlite3'
 import type { ToolResult } from './types.js'
+import { findSupersessionTarget } from './supersede.js'
 
 const DB_PATH = process.env.HYDRA_DB || `${process.env.HOME}/.hydra/hydra.db`
 
@@ -208,10 +209,12 @@ function addTodo(input: Record<string, unknown>): ToolResult {
     // Priority based on horizon
     const priority = horizon === 'today' ? 2 : horizon === 'this_week' ? 3 : 4
 
+    // TTL: today tasks expire in 24h, this_week in 168h, someday = no expiry
+    const ttlHours = horizon === 'today' ? 24 : horizon === 'this_week' ? 168 : null
     db.prepare(`
-      INSERT INTO tasks (id, title, description, priority, due_at, assigned_to, source, task_type, status)
-      VALUES (?, ?, ?, ?, ?, 'eddie', 'milo', 'todo', 'pending')
-    `).run(id, input.title, input.context || null, priority, dueAt)
+      INSERT INTO tasks (id, title, description, priority, due_at, assigned_to, source, task_type, status, ttl_hours)
+      VALUES (?, ?, ?, ?, ?, 'eddie', 'milo', 'todo', 'pending', ?)
+    `).run(id, input.title, input.context || null, priority, dueAt, ttlHours)
 
     return { success: true, data: { id, horizon, due_at: dueAt }, message: `Got it. Tracking: ${input.title} (${horizon})` }
   } finally { db.close() }
@@ -268,10 +271,14 @@ function createTask(input: Record<string, unknown>): ToolResult {
   const db = getDb()
   try {
     const id = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString('hex')
+    // TTL: tasks with due_at today get 24h TTL, others get no expiry by default
+    const dueAt = input.due_at as string | null
+    const isToday = dueAt && dueAt === new Date().toISOString().split('T')[0]
+    const ttlHours = isToday ? 24 : null
     db.prepare(`
-      INSERT INTO tasks (id, title, description, priority, due_at, assigned_to, source, status)
-      VALUES (?, ?, ?, ?, ?, 'eddie', 'milo', 'pending')
-    `).run(id, input.title, input.description || null, input.priority || 3, input.due_at || null)
+      INSERT INTO tasks (id, title, description, priority, due_at, assigned_to, source, status, ttl_hours)
+      VALUES (?, ?, ?, ?, ?, 'eddie', 'milo', 'pending', ?)
+    `).run(id, input.title, input.description || null, input.priority || 3, dueAt, ttlHours)
     return { success: true, data: { id }, message: `Task created: ${input.title}` }
   } finally { db.close() }
 }
@@ -317,28 +324,29 @@ function updateTask(input: Record<string, unknown>): ToolResult {
 function saveMemory(input: Record<string, unknown>): ToolResult {
   const db = getDb()
   try {
-    // Dedup: check for existing memory with similar content (first 40 chars)
     const content = input.content as string
-    const prefix = content.substring(0, 40)
-    const existing = db.prepare(
-      'SELECT id, content, importance FROM milo_memories WHERE content LIKE ? AND superseded_by IS NULL'
-    ).get(`${prefix}%`) as { id: number; content: string; importance: number } | undefined
+    const category = input.category as string
+    const domain = (input.domain as string) || null
+    const importance = (input.importance as number) || 5
 
-    if (existing) {
-      // Update importance if new one is higher
-      const newImportance = (input.importance as number) || 5
-      if (newImportance > existing.importance) {
-        db.prepare('UPDATE milo_memories SET importance = ? WHERE id = ?').run(newImportance, existing.id)
-      }
-      return { success: true, data: { id: existing.id }, message: `Memory already tracked (updated importance)` }
-    }
+    // Find supersession target BEFORE inserting (so we don't match ourselves).
+    const targetId = findSupersessionTarget(db, { content, category, domain, importance })
+    const targetImportance = targetId !== null
+      ? (db.prepare('SELECT importance FROM milo_memories WHERE id = ?').get(targetId) as { importance: number } | undefined)?.importance ?? importance
+      : importance
+    const finalImportance = Math.max(importance, targetImportance)
 
-    const stmt = db.prepare(`
+    const info = db.prepare(`
       INSERT INTO milo_memories (content, category, importance, domain)
       VALUES (?, ?, ?, ?)
-    `)
-    const info = stmt.run(content, input.category, input.importance || 5, input.domain || null)
-    return { success: true, data: { id: info.lastInsertRowid }, message: `Memory saved: ${content}` }
+    `).run(content, category, finalImportance, domain)
+    const newId = info.lastInsertRowid as number
+
+    if (targetId !== null) {
+      db.prepare('UPDATE milo_memories SET superseded_by = ?, updated_at = datetime(\'now\') WHERE id = ?').run(newId, targetId)
+      return { success: true, data: { id: newId, superseded: targetId }, message: `Memory saved; superseded ${targetId}` }
+    }
+    return { success: true, data: { id: newId }, message: `Memory saved: ${content}` }
   } finally { db.close() }
 }
 

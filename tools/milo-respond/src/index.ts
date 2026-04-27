@@ -17,16 +17,18 @@ import { executeTool } from './tool-executor.js'
 
 // -- Parse CLI args --
 
-function parseArgs(): { message: string; messageId: string; sessionId: string } {
+function parseArgs(): { message: string; messageId: string; sessionId: string; lockinFresh: boolean } {
   const args = process.argv.slice(2)
   let message = ''
   let messageId = ''
   let sessionId = ''
+  let lockinFresh = false
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--message' && args[i + 1]) message = args[++i]
     else if (args[i] === '--message-id' && args[i + 1]) messageId = args[++i]
     else if (args[i] === '--session-id' && args[i + 1]) sessionId = args[++i]
+    else if (args[i] === '--lockin-fresh') lockinFresh = true
   }
 
   if (!message) {
@@ -34,7 +36,7 @@ function parseArgs(): { message: string; messageId: string; sessionId: string } 
     process.exit(1)
   }
 
-  return { message, messageId, sessionId: sessionId || 'default' }
+  return { message, messageId, sessionId: sessionId || 'default', lockinFresh }
 }
 
 // -- Compose System Prompt --
@@ -88,10 +90,10 @@ function buildMessages(
 // -- Main Pipeline --
 
 async function main() {
-  const { message, messageId, sessionId } = parseArgs()
+  const { message, messageId, sessionId, lockinFresh } = parseArgs()
 
-  // 1. Load CaF consciousness
-  const cafPrompt = composeMiloPrompt('chat')
+  // 1. Load CaF consciousness + coordination layer (threaded with current message for name-mentioned person preloading, and lock-in surfacing if Eddie's been away >= 2hr)
+  const cafPrompt = composeMiloPrompt('chat', { currentMessage: message, lockinFresh })
 
   // 2. Load context from DB
   const rollingWindow = parseInt(process.env.MILO_ROLLING_WINDOW || '40')
@@ -128,43 +130,36 @@ async function main() {
       tools: ALL_TOOLS,
     })
 
-    // Process response content blocks
-    let hasToolUse = false
     const assistantContent: Anthropic.Messages.ContentBlock[] = response.content
+    const toolResults: Anthropic.Messages.ToolResultBlockParam[] = []
 
     for (const block of assistantContent) {
       if (block.type === 'text') {
         finalText += block.text
       } else if (block.type === 'tool_use') {
-        hasToolUse = true
-
-        // Execute the tool
         const result = executeTool(block.name, block.input as Record<string, unknown>)
 
-        // Save tool interaction
         saveTurn('tool_use', JSON.stringify(block.input), sessionId, undefined, block.name, JSON.stringify(block.input))
         saveTurn('tool_result', JSON.stringify(result), sessionId, undefined, block.name)
 
-        // Build continuation with tool result
-        currentMessages = [
-          ...currentMessages,
-          { role: 'assistant', content: assistantContent },
-          {
-            role: 'user',
-            content: [{
-              type: 'tool_result' as const,
-              tool_use_id: block.id,
-              content: JSON.stringify(result),
-            }],
-          },
-        ]
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: block.id,
+          content: JSON.stringify(result),
+        })
       }
     }
 
-    // If no tool use, we're done
-    if (!hasToolUse) break
+    if (toolResults.length === 0) break
 
-    // Reset finalText for next iteration (Claude will regenerate)
+    // Append the full assistant turn and a single user turn carrying ALL tool_results.
+    // The API requires every tool_use block to be paired with a tool_result block in the immediately following user turn.
+    currentMessages = [
+      ...currentMessages,
+      { role: 'assistant', content: assistantContent },
+      { role: 'user', content: toolResults },
+    ]
+
     finalText = ''
   }
 
