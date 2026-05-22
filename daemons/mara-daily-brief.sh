@@ -72,7 +72,7 @@ BRIEF="<b>MARA — $DAY_NAME $MONTH_NAME $DAY_NUM</b>"$'\n'$'\n'
 # Check if weekly plan exists
 if [[ ! -f "$WEEKLY_PLAN" ]]; then
     BRIEF+="No weekly plan found. Run /gtm to set one."$'\n'
-    "$NOTIFY" "urgent" "MARA" "$BRIEF"
+    "$NOTIFY" "urgent" "MARA" "$BRIEF" || true
     touch "$MARA_SENT_FILE"
     log "No weekly plan. Sent alert."
     exit 0
@@ -88,8 +88,8 @@ TODAY_SECTION=$(awk -v day="$DAY_NAME" '
 
 if [[ -n "$TODAY_SECTION" ]]; then
     # Extract Eddie's actions
-    EDDIE_ACTIONS=$(echo "$TODAY_SECTION" | grep -E "^[0-9]+\." | head -5)
-    MARA_ACTIONS=$(echo "$TODAY_SECTION" | sed -n '/MARA Does/,/^$/p' | grep -E "^-" | head -5)
+    EDDIE_ACTIONS=$(echo "$TODAY_SECTION" | grep -E "^[0-9]+\." | head -5 || true)
+    MARA_ACTIONS=$(echo "$TODAY_SECTION" | sed -n '/MARA Does/,/^$/p' | grep -E "^-" | head -5 || true)
 
     if [[ -n "$EDDIE_ACTIONS" ]]; then
         BRIEF+="<b>YOUR ACTIONS TODAY:</b>"$'\n'
@@ -136,7 +136,10 @@ elif [[ -f "$SKIP_FLAG" ]] && [[ "$(cat "$SKIP_FLAG")" == "$DOW" ]]; then
 elif [[ "$DOW" -eq 6 || "$DOW" -eq 7 ]]; then
     BRIEF+="<b>POSTING:</b> Weekend, no posts."$'\n'$'\n'
 else
-    READY_COUNT=$(ls "$DISTRO/ready-to-post"/*.md 2>/dev/null | wc -l | tr -d ' ')
+    READY_COUNT=0
+    if [[ -d "$DISTRO/ready-to-post" ]]; then
+        READY_COUNT=$(find "$DISTRO/ready-to-post" -maxdepth 1 -name "*.md" | wc -l | tr -d ' ')
+    fi
     BRIEF+="<b>POSTING:</b> Daemon will fire at 9 AM + jitter. $READY_COUNT pieces in pipeline."$'\n'$'\n'
 fi
 
