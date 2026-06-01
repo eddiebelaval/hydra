@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.id8labs.mempalace-canonical-sync</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/eddiebelaval/.hydra/tools/mempalace-canonical-sync.sh</string>
+    </array>
+
+    <!-- Daily at 9:30am: after the 9:00 auto-journal reconciler and 9:15
+         article ingest, so the day's filed events are mirrored into the
+         MemPalace canonical_brain replica. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>9</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/eddiebelaval/Library/Logs/mempalace-canonical-sync/launchd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/eddiebelaval/Library/Logs/mempalace-canonical-sync/launchd.err.log</string>
+</dict>
+</plist>
