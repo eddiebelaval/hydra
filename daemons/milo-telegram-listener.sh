@@ -132,6 +132,12 @@ fi
 
 # Export for the TS responder
 export HYDRA_DB
+
+# Canonical shared brain -- the live `-id8` memory tree every Claude Code
+# session loads. Explicit here so MILO/HYDRA never silently fall back to the
+# pre-move path (frozen May 4 2026) that blinded them to the workshop, D&B,
+# and the federation pod. See hydra-caf-loader.ts COORDINATION_ROOT.
+export COORDINATION_ROOT="${COORDINATION_ROOT:-$HOME/.claude/projects/-Users-eddiebelaval-Development-id8/memory}"
 export MILO_CHAT_MODEL="${MILO_CHAT_MODEL:-claude-sonnet-4-20250514}"
 export MILO_EXTRACTION_MODEL="${MILO_EXTRACTION_MODEL:-claude-haiku-4-5-20251001}"
 export MILO_ROLLING_WINDOW="${MILO_ROLLING_WINDOW:-40}"
@@ -181,14 +187,31 @@ _send_single() {
     local text="$1"
     local reply_to="${2:-}"
 
-    # Use --data-urlencode for safe encoding of arbitrary text
-    local args=(-X POST "$MILO_API/sendMessage"
-        --data-urlencode "text=$text"
-        -d "chat_id=$MILO_CHAT_ID")
+    # MILO's replies are Claude output (Markdown: **bold**, *italic*, `code`).
+    # Without parse_mode Telegram prints the markers literally, so convert to
+    # HTML and send with parse_mode=HTML. --data-urlencode handles encoding.
+    local html
+    html=$(printf '%s' "$text" | python3 "$HYDRA_ROOT/tools/md-to-tg-html.py" --raw 2>/dev/null)
+    [[ -z "$html" ]] && html="$text"  # converter failure -> raw text
 
+    local args=(-X POST "$MILO_API/sendMessage"
+        --data-urlencode "text=$html"
+        -d "parse_mode=HTML"
+        -d "chat_id=$MILO_CHAT_ID")
     [[ -n "$reply_to" ]] && args+=(-d "reply_to_message_id=$reply_to")
 
-    telegram_curl "${args[@]}" >/dev/null 2>&1 || true
+    local resp
+    resp=$(telegram_curl "${args[@]}" 2>/dev/null)
+
+    # Telegram rejects malformed HTML entities with "can't parse entities".
+    # Never drop a message over formatting -- retry once as plain text.
+    if ! echo "$resp" | grep -q '"ok":true'; then
+        local plain=(-X POST "$MILO_API/sendMessage"
+            --data-urlencode "text=$text"
+            -d "chat_id=$MILO_CHAT_ID")
+        [[ -n "$reply_to" ]] && plain+=(-d "reply_to_message_id=$reply_to")
+        telegram_curl "${plain[@]}" >/dev/null 2>&1 || true
+    fi
 }
 
 # ============================================================================

@@ -218,8 +218,72 @@ function loadLifeContext(): string {
 // appear in the current message. Lock-in surfacing is injected when Eddie
 // returns after a gap exceeding MILO_LOCKIN_THRESHOLD.
 
+// CANONICAL BRAIN. Single source of truth every Claude Code session auto-loads:
+// the MEMORY.md dispatcher + ~133 topical project_*/feedback_*/reference_*
+// files. Must point at the live `-id8` tree. The old default (no `-id8`) is the
+// pre-move path frozen May 4 2026 -- the reason Milo went blind to every event
+// after the working-dir move (the workshop, D&B, the federation pod).
 const COORDINATION_ROOT = process.env.COORDINATION_ROOT ||
-  `${process.env.HOME}/.claude/projects/-Users-eddiebelaval-Development/memory`
+  `${process.env.HOME}/.claude/projects/-Users-eddiebelaval-Development-id8/memory`
+
+// Slug tokens too generic to be a useful on-message match signal.
+const TOPIC_STOP_TOKENS = new Set([
+  'project', 'feedback', 'reference', 'active', 'first', 'product', 'commissioned',
+  'update', 'default', 'pattern', 'patterns', 'system', 'locked', 'works', 'with',
+  'this', 'that', 'about', 'into', 'meeting', 'call', 'page',
+])
+
+// Inject the dispatcher index -- Milo's window into everything the portfolio
+// knows. If Eddie references a workshop, engagement, person, or decision, it is
+// catalogued here; Milo must read it rather than ask "what workshop?".
+function loadMemoryIndex(): string {
+  try {
+    const idx = fs.readFileSync(path.join(COORDINATION_ROOT, 'MEMORY.md'), 'utf-8').trim()
+    if (!idx) return ''
+    return `## Portfolio Memory Index (shared brain -- the SAME index every Claude Code session loads)
+
+This is the canonical record of what the portfolio knows. If Eddie mentions a workshop, an engagement, a person, a product, or a past decision, it is almost certainly in this index or its linked topic files. NEVER respond as if a catalogued event did not happen -- read the index first.
+
+${idx.substring(0, 24000)}`
+  } catch {
+    return ''
+  }
+}
+
+// On-message deep recall: pull the full topic files whose slug keywords appear
+// in Eddie's message. Surfaces only the relevant compartment (no leakage of
+// unrelated topics into the prompt).
+function loadRelevantTopics(message: string): string {
+  try {
+    const lower = ` ${message.toLowerCase()} `
+    const files = fs.readdirSync(COORDINATION_ROOT)
+      .filter(f => /^(project|feedback|reference)_.+\.md$/.test(f))
+    const scored: { file: string; hits: number }[] = []
+    for (const f of files) {
+      const tokens = f.replace(/\.md$/, '').split('_').slice(1)
+        .filter(t => t.length >= 5 && !TOPIC_STOP_TOKENS.has(t))
+      let hits = 0
+      for (const t of tokens) {
+        const esc = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        if (new RegExp(`\\b${esc}\\b`).test(lower)) hits++
+      }
+      if (hits > 0) scored.push({ file: f, hits })
+    }
+    scored.sort((a, b) => b.hits - a.hits)
+    const out: string[] = []
+    for (const { file } of scored.slice(0, 4)) {
+      try {
+        const c = fs.readFileSync(path.join(COORDINATION_ROOT, file), 'utf-8').trim()
+        if (c) out.push(`### ${file}\n\n${c.substring(0, 2500)}`)
+      } catch { /* skip */ }
+    }
+    return out.length
+      ? `## Relevant Memory Detail (pulled because your message referenced these topics)\n\n${out.join('\n\n')}`
+      : ''
+  } catch {
+    return ''
+  }
+}
 
 function matchPeopleInMessage(message: string): string[] {
   try {
@@ -250,6 +314,15 @@ function matchPeopleInMessage(message: string): string[] {
 function loadCoordinationContext(currentMessage?: string, lockinFresh = false): string {
   const parts: string[] = []
 
+  // Canonical brain: dispatcher index always; relevant topic files on-message.
+  const memoryIndex = loadMemoryIndex()
+  if (memoryIndex) parts.push(memoryIndex)
+  if (currentMessage) {
+    const topics = loadRelevantTopics(currentMessage)
+    if (topics) parts.push(topics)
+  }
+
+  // Legacy board files -- optional, do not exist in the canonical `-id8` tree.
   try {
     const tasks = fs.readFileSync(path.join(COORDINATION_ROOT, 'active-tasks.md'), 'utf-8').trim()
     if (tasks) parts.push(`## Shared Task Board (from active-tasks.md)\n\n${tasks.substring(0, 4000)}`)
