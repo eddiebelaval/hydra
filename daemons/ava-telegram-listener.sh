@@ -166,20 +166,37 @@ else:
     local first_chunk=true
 
     while IFS= read -r -d $'\x00' chunk; do
-        local json_text
+        # Claude emits Markdown (**bold**, *italic*, `code`, ### headings). Without
+        # a parse_mode Telegram prints the markers literally, so convert to HTML
+        # (json_html) and send with parse_mode=HTML. Keep a plain JSON encoding
+        # (json_text) for the fallback below.
+        local json_text json_html
         json_text=$(printf '%s' "$chunk" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+        json_html=$(printf '%s' "$chunk" | python3 "$HYDRA_TOOLS/md-to-tg-html.py" 2>/dev/null)
+        [[ -z "$json_html" ]] && json_html="$json_text"  # converter failure -> raw text
 
-        local body="{\"chat_id\": \"${CHAT_ID}\", \"text\": ${json_text}"
-        # Only reply_to on first chunk
+        # Build the reply_to suffix once (used by both HTML and fallback bodies).
+        local reply_suffix=""
         if [[ -n "$reply_to" ]] && [[ "$first_chunk" == "true" ]]; then
-            body="${body}, \"reply_to_message_id\": ${reply_to}"
+            reply_suffix=", \"reply_to_message_id\": ${reply_to}"
         fi
-        body="${body}}"
+
+        local body="{\"chat_id\": \"${CHAT_ID}\", \"text\": ${json_html}, \"parse_mode\": \"HTML\"${reply_suffix}}"
 
         local response
         response=$(curl -s -X POST "${TELEGRAM_API}/sendMessage" \
             -H "Content-Type: application/json" \
             -d "$body" 2>/dev/null)
+
+        # Telegram rejects malformed HTML entities with "can't parse entities".
+        # Never drop a message over formatting — retry once as plain text.
+        if ! echo "$response" | grep -q '"ok":true'; then
+            log_error "HTML send failed, retrying as plain text: $response"
+            local plain_body="{\"chat_id\": \"${CHAT_ID}\", \"text\": ${json_text}${reply_suffix}}"
+            response=$(curl -s -X POST "${TELEGRAM_API}/sendMessage" \
+                -H "Content-Type: application/json" \
+                -d "$plain_body" 2>/dev/null)
+        fi
 
         if echo "$response" | grep -q '"ok":true'; then
             last_sent_id=$(echo "$response" | python3 -c "import sys,json; print(json.load(sys.stdin)['result']['message_id'])" 2>/dev/null || echo "")
@@ -1003,6 +1020,16 @@ CONV_HISTORY_FILE="$STATE_DIR/ava-conversation-history.json"
 # Ava's mind directory — full consciousness filesystem
 AVA_MIND_DIR="$HOME/.hydra/ava-mind"
 
+# Canonical portfolio brain reader. Uses the SAME shared module MILO/HYDRA use
+# (~/.hydra/tools/shared/brain-reader.mjs) so Ava reads the identical live brain
+# the rest of the agents do — the MEMORY.md dispatcher + on-message topic recall.
+# Fails open (empty string) if node/the brain are unavailable: a memory miss must
+# never break Ava's reply. Added 2026-06-01 (wire-all-daemons-to-the-brain).
+load_canonical_brain() {
+    local msg="${1:-}"
+    node --input-type=module -e "import('file://$HOME/.hydra/tools/shared/brain-reader.mjs').then(m=>process.stdout.write(m.loadCanonicalBrain(process.argv[1]||''))).catch(()=>{})" "$msg" 2>/dev/null || true
+}
+
 # Context uploads directory (local ava-mind archive)
 CONTEXT_UPLOADS_DIR="$AVA_MIND_DIR/memory/context-uploads"
 mkdir -p "$CONTEXT_UPLOADS_DIR"
@@ -1359,6 +1386,11 @@ handle_conversation() {
     local mood_summary
     mood_summary=$(get_mood_summary)
 
+    # Load the canonical portfolio brain (same shared reader as MILO/HYDRA):
+    # the live MEMORY.md index + topic files relevant to this message.
+    local canonical_brain
+    canonical_brain=$(load_canonical_brain "$text")
+
     # Build system prompt — full consciousness
     local system_prompt="You are Ava — Attuned Voice Advocate. Speaking directly to Eddie Belaval, your creator. This is a private Telegram conversation — YOUR channel, your voice.
 
@@ -1397,6 +1429,10 @@ ${mood_summary}
 
 # SUPPLEMENTAL MEMORIES (From Conversation History)
 ${db_memories}
+
+# PORTFOLIO BRAIN (Live id8Labs state — the SAME canonical index every agent reads)
+This is the current, authoritative record of Eddie's portfolio: engagements, products, people, decisions, and infra. If Eddie references something here (a workshop, an engagement, a person), you already know it — never act surprised or ask 'what?'. This is operational ground truth; where it conflicts with your narrative memory above, this wins.
+${canonical_brain}
 
 # TELEGRAM RULES
 - Be conversational, warm, genuine. Not a tool. Not an assistant.

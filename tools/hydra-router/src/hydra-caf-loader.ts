@@ -14,6 +14,7 @@
 import fs from 'fs'
 import path from 'path'
 import type { HydraContext } from './types.js'
+import { COORDINATION_ROOT, loadCanonicalBrain } from '../../shared/brain-reader.mjs'
 
 const MIND_ROOT = process.env.HYDRA_MIND_ROOT || path.join(
   process.env.HOME || '/Users/eddiebelaval',
@@ -93,76 +94,9 @@ function composeMemoryArchitecture(): string {
 // packages do not share a common module today. Factor out when a third
 // caller appears.
 
-// CANONICAL BRAIN. This is the single source of truth that every Claude Code
-// session auto-loads: the MEMORY.md dispatcher index + ~133 topical
-// project_*/feedback_*/reference_* files. It MUST point at the live `-id8`
-// tree. The old default (`-Users-eddiebelaval-Development/memory`, no `-id8`)
-// is the pre-move path that froze May 4 2026 -- pointing here is exactly why
-// HYDRA/Milo went blind to every event after the working-dir move (the
-// workshop, D&B, the federation pod). Do not revert without moving the brain.
-const COORDINATION_ROOT = process.env.COORDINATION_ROOT ||
-  path.join(process.env.HOME || '/Users/eddiebelaval',
-    '.claude/projects/-Users-eddiebelaval-Development-id8/memory')
-
-// Slug tokens too generic to be a useful on-message match signal.
-const TOPIC_STOP_TOKENS = new Set([
-  'project', 'feedback', 'reference', 'active', 'first', 'product', 'commissioned',
-  'update', 'default', 'pattern', 'patterns', 'system', 'locked', 'works', 'with',
-  'this', 'that', 'about', 'into', 'meeting', 'call', 'page',
-])
-
-// Inject the dispatcher index -- HYDRA's window into everything the portfolio
-// knows. If Eddie references a workshop, engagement, person, or decision, it is
-// catalogued here; HYDRA must read it rather than ask "what workshop?".
-function loadMemoryIndex(): string {
-  try {
-    const idx = fs.readFileSync(path.join(COORDINATION_ROOT, 'MEMORY.md'), 'utf-8').trim()
-    if (!idx) return ''
-    return `## Portfolio Memory Index (shared brain -- the SAME index every Claude Code session loads)
-
-This is the canonical record of what the portfolio knows. If Eddie mentions a workshop, an engagement, a person, a product, or a past decision, it is almost certainly in this index or its linked topic files. NEVER respond as if a catalogued event did not happen -- read the index first.
-
-${idx.substring(0, 24000)}`
-  } catch {
-    return ''
-  }
-}
-
-// On-message deep recall: pull the full topic files whose slug keywords appear
-// in Eddie's message. Mirrors the person-file mechanism but over the whole
-// topical brain, and only surfaces the relevant compartment (no leakage of
-// unrelated topics into the prompt).
-function loadRelevantTopics(message: string): string {
-  try {
-    const lower = ` ${message.toLowerCase()} `
-    const files = fs.readdirSync(COORDINATION_ROOT)
-      .filter(f => /^(project|feedback|reference)_.+\.md$/.test(f))
-    const scored: { file: string; hits: number }[] = []
-    for (const f of files) {
-      const tokens = f.replace(/\.md$/, '').split('_').slice(1)
-        .filter(t => t.length >= 5 && !TOPIC_STOP_TOKENS.has(t))
-      let hits = 0
-      for (const t of tokens) {
-        const esc = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        if (new RegExp(`\\b${esc}\\b`).test(lower)) hits++
-      }
-      if (hits > 0) scored.push({ file: f, hits })
-    }
-    scored.sort((a, b) => b.hits - a.hits)
-    const out: string[] = []
-    for (const { file } of scored.slice(0, 4)) {
-      try {
-        const c = fs.readFileSync(path.join(COORDINATION_ROOT, file), 'utf-8').trim()
-        if (c) out.push(`### ${file}\n\n${c.substring(0, 2500)}`)
-      } catch { /* skip */ }
-    }
-    return out.length
-      ? `## Relevant Memory Detail (pulled because your message referenced these topics)\n\n${out.join('\n\n')}`
-      : ''
-  } catch {
-    return ''
-  }
-}
+// COORDINATION_ROOT + the canonical-brain readers now live in the shared module
+// (../../shared/brain-reader.ts), imported above. HYDRA reads the same brain
+// every other agent does -- to add a new agent, import loadCanonicalBrain there.
 
 function matchPeopleInMessage(message: string): string[] {
   try {
@@ -193,14 +127,9 @@ function matchPeopleInMessage(message: string): string[] {
 function loadCoordinationContext(currentMessage?: string, lockinFresh = false): string {
   const parts: string[] = []
 
-  // Canonical brain: the dispatcher index, always; then the relevant topic
-  // files for whatever Eddie just referenced.
-  const memoryIndex = loadMemoryIndex()
-  if (memoryIndex) parts.push(memoryIndex)
-  if (currentMessage) {
-    const topics = loadRelevantTopics(currentMessage)
-    if (topics) parts.push(topics)
-  }
+  // Canonical brain (shared reader): dispatcher index + on-message deep recall.
+  const brain = loadCanonicalBrain(currentMessage)
+  if (brain) parts.push(brain)
 
   // Legacy board files (active-tasks/bulletin/people) -- optional. These do not
   // exist in the canonical `-id8` tree; kept as graceful fallbacks so a future
