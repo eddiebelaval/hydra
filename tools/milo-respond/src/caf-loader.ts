@@ -334,10 +334,18 @@ export function composeMiloPrompt(
   // Layer 2: Training Docs (what Milo KNOWS about the relationship)
   parts.push(composeBrain(context))
 
-  // Layer 3: Life Triad (Eddie's life context -- chat only, too much for nudges)
+  // Layer 3: Canonical portfolio brain -- EVERY context, not just chat.
+  // Proactive nudges/briefings were going out BLIND (e.g. "Profesa workshop
+  // deadline 13 days out" after it had already shipped) because the brain was
+  // chat-only. Ground all of Milo's utterances -- reactive AND proactive -- in
+  // current portfolio truth. Chat gets the full coordination layer (life context
+  // + on-message topic recall); proactive contexts get the dispatcher index.
   if (context === 'chat') {
     parts.push(loadLifeContext())
     parts.push(loadCoordinationContext(options.currentMessage, options.lockinFresh))
+  } else {
+    const brain = loadCanonicalBrain()
+    if (brain) parts.push(brain)
   }
 
   return parts.filter(Boolean).join('\n\n')
