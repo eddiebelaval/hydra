@@ -40,6 +40,27 @@ const TOPIC_STOP_TOKENS = new Set([
   'this', 'that', 'about', 'into', 'meeting', 'call', 'page',
 ])
 
+// Authoritative corrections -- the field-correction layer. When Eddie catches a
+// stale memory in chat ("that already shipped", "wipe that", "update that to X"),
+// an agent's correct_memory tool appends here. Injected at the TOP of the brain
+// so it OVERRIDES the index/topic files immediately, for every agent. Fold into
+// the canonical topic files (then clear this) during a Claude Code memory pass.
+export const CORRECTIONS_PATH = path.join(COORDINATION_ROOT, '_CORRECTIONS.md')
+
+export function loadCorrections() {
+  try {
+    const c = fs.readFileSync(CORRECTIONS_PATH, 'utf-8').trim()
+    if (!c) return ''
+    return `## AUTHORITATIVE CORRECTIONS (most recent ground truth -- these OVERRIDE anything below that conflicts)
+
+Eddie corrected these in the field. If anything in the memory index or topic files contradicts a correction here, the correction wins. Never repeat a claim that a correction has superseded.
+
+${c.substring(0, 6000)}`
+  } catch {
+    return ''
+  }
+}
+
 // The dispatcher index -- the agent's window into everything the portfolio
 // knows. If Eddie references a workshop, engagement, person, product, or past
 // decision, it is catalogued here; the agent must read it, not ask "what?".
@@ -97,6 +118,9 @@ export function loadRelevantTopics(message) {
 // must not break an agent turn).
 export function loadCanonicalBrain(currentMessage) {
   const parts = []
+  // Corrections FIRST -- highest priority, override everything below.
+  const corr = loadCorrections()
+  if (corr) parts.push(corr)
   const idx = loadMemoryIndex()
   if (idx) parts.push(idx)
   if (currentMessage) {

@@ -6,10 +6,47 @@
  */
 
 import Database from 'better-sqlite3'
+import { appendFileSync, existsSync } from 'fs'
 import type { ToolResult } from './types.js'
 import { findSupersessionTarget } from './supersede.js'
+import { CORRECTIONS_PATH } from '../../shared/brain-reader.mjs'
 
 const DB_PATH = process.env.HYDRA_DB || `${process.env.HOME}/.hydra/hydra.db`
+
+// -- Field Correction Handler --
+//
+// Eddie corrects a stale memory in chat -> append to the shared _CORRECTIONS.md,
+// which the brain-reader injects at the TOP of every agent's brain. Immediate,
+// cross-agent override. Folded into the canonical topic files later by a Claude
+// Code memory pass, then cleared.
+function correctMemory(input: Record<string, unknown>): ToolResult {
+  // Eddie's hard rule: no em/en dashes anywhere he reads. Sanitize at the write
+  // point so a correction can never reintroduce them into the brain.
+  const noDash = (s: string) => s.replace(/[—–]/g, '-')
+  const correction = noDash(String(input.correction || '').trim())
+  const staleClaim = noDash(String(input.stale_claim || '').trim())
+  const topic = noDash(String(input.topic || '').trim())
+  if (!correction) {
+    return { success: false, data: null, message: 'correction is required (what is actually true now)' }
+  }
+  const stamp = new Date().toISOString().slice(0, 10)
+  const header = existsSync(CORRECTIONS_PATH)
+    ? ''
+    : '# Authoritative Corrections\n\n> Injected at the TOP of the canonical brain by the shared brain-reader; these OVERRIDE the memory index and topic files. Appended by agents when Eddie corrects a stale memory in the field. Fold into the canonical topic files, then clear, during the next Claude Code memory pass.\n\n'
+  const entry =
+    `- **${stamp}**${topic ? ` [${topic}]` : ''}: ${correction}` +
+    (staleClaim ? `\n  (supersedes: "${staleClaim}")` : '') + '\n'
+  try {
+    appendFileSync(CORRECTIONS_PATH, header + entry, 'utf-8')
+    return {
+      success: true,
+      data: { file: CORRECTIONS_PATH, recorded: entry.trim() },
+      message: 'Correction recorded. It now overrides the stale memory at the top of the brain for every agent.',
+    }
+  } catch (err) {
+    return { success: false, data: null, message: `Failed to write correction: ${(err as Error).message}` }
+  }
+}
 
 function getDb(): Database.Database {
   return new Database(DB_PATH, { readonly: false })
@@ -228,40 +265,47 @@ function completeTodo(input: Record<string, unknown>): ToolResult {
   } finally { db.close() }
 }
 
+// "What's on our plate" reads the SAME centralized board as every other agent:
+// the v_master_plate view (open tasks + active goals, domain-parsed, staleness
+// guard baked in) plus the cohort prereq gate. The CLI (~/.hydra/tools/master-plate.py)
+// reads the identical view, so the Telegram bot and any other reader can never diverge.
 function whatsOnMyPlate(input: Record<string, unknown>): ToolResult {
   const db = getDb()
   try {
-    const horizon = (input.horizon as string) || 'all'
     const result: Record<string, unknown> = {}
 
-    // Todos
-    let todoSql = "SELECT id, title, priority, due_at, created_at, description FROM tasks WHERE assigned_to = 'eddie' AND status IN ('pending', 'in_progress') AND task_type = 'todo'"
-    if (horizon === 'today') todoSql += " AND due_at <= datetime('now', '+1 day')"
-    else if (horizon === 'this_week') todoSql += " AND (due_at IS NULL OR due_at <= datetime('now', '+7 days'))"
-    else if (horizon === 'this_month') todoSql += " AND (due_at IS NULL OR due_at <= datetime('now', '+31 days'))"
-    todoSql += ' ORDER BY priority ASC, due_at ASC'
-    result.todos = db.prepare(todoSql).all()
+    // The master board, grouped by domain (the single source of truth).
+    const plateRows = db.prepare(
+      "SELECT kind, title, domain, owner, status, priority, due_at, progress FROM v_master_plate"
+    ).all() as Array<Record<string, unknown>>
+    const byDomain: Record<string, unknown[]> = {}
+    for (const r of plateRows) {
+      const d = (r.domain as string) || 'general'
+      ;(byDomain[d] ||= []).push(r)
+    }
+    result.plate_by_domain = byDomain
 
-    // Formal tasks
-    let taskSql = "SELECT id, title, priority, due_at, status, created_at FROM tasks WHERE assigned_to = 'eddie' AND status IN ('pending', 'in_progress', 'blocked') AND (task_type != 'todo' OR task_type IS NULL)"
-    taskSql += ' ORDER BY priority ASC, due_at ASC LIMIT 10'
-    result.tasks = db.prepare(taskSql).all()
+    // Cohort prereq gate (member-level visibility lives in cohort_members).
+    try {
+      const cohort = db.prepare('SELECT * FROM v_cohort_prereqs').get() as Record<string, unknown> | undefined
+      if (cohort && Number(cohort.total_members) > 0) result.cohort = cohort
+    } catch { /* view may not exist on older DBs */ }
 
-    // Active goals
-    result.goals = db.prepare("SELECT id, description, progress, horizon, period, category FROM goals WHERE status = 'active' ORDER BY horizon, period").all()
+    // Live revenue (derived from the revenue_checks tracker, never a stale line).
+    try {
+      const revenue = db.prepare('SELECT * FROM v_revenue_summary').all() as Array<Record<string, unknown>>
+      if (revenue.length) result.revenue = revenue
+    } catch { /* view may not exist on older DBs */ }
 
-    // Upcoming events (next 7 days)
-    result.events = db.prepare("SELECT id, title, event_type, starts_at FROM milo_events WHERE status = 'active' AND (starts_at IS NULL OR starts_at <= datetime('now', '+7 days')) ORDER BY starts_at ASC").all()
+    // Upcoming events (calendar, kept separate from the todo board).
+    result.events = db.prepare(
+      "SELECT id, title, event_type, starts_at FROM milo_events WHERE status = 'active' AND (starts_at IS NULL OR starts_at <= datetime('now', '+7 days')) AND (starts_at IS NULL OR starts_at >= datetime('now', '-1 day')) ORDER BY starts_at ASC"
+    ).all()
 
-    // Active strategies
-    result.strategies = db.prepare("SELECT id, title, status FROM milo_strategies WHERE status = 'active'").all()
-
-    const todoCount = (result.todos as unknown[]).length
-    const taskCount = (result.tasks as unknown[]).length
-    const goalCount = (result.goals as unknown[]).length
+    const itemCount = plateRows.length
+    const domainCount = Object.keys(byDomain).length
     const eventCount = (result.events as unknown[]).length
-
-    return { success: true, data: result, message: `${todoCount} todos, ${taskCount} tasks, ${goalCount} goals, ${eventCount} events` }
+    return { success: true, data: result, message: `${itemCount} items across ${domainCount} domains, ${eventCount} events` }
   } finally { db.close() }
 }
 
@@ -434,7 +478,34 @@ function completeEventByTitle(input: Record<string, unknown>): ToolResult {
 
 // -- Dispatcher --
 
+// Mark a revenue check collected (e.g. Eddie: "the Rose check came in").
+// Updates the single source (revenue_checks) so the board + summary refresh at once.
+function markRevenueCheck(input: Record<string, unknown>): ToolResult {
+  const db = new Database(DB_PATH, { readonly: false })
+  try {
+    const engagement = String(input.engagement || '').trim()
+    if (!engagement) return { success: false, data: null, message: 'Need an engagement (e.g. rose-dnb).' }
+    // If no check number given, collect the earliest still-due check for that engagement.
+    let n = input.check_number != null ? Number(input.check_number) : null
+    if (n == null) {
+      const row = db.prepare(
+        "SELECT check_number FROM revenue_checks WHERE engagement=? AND status='due' ORDER BY due_date LIMIT 1"
+      ).get(engagement) as { check_number?: number } | undefined
+      if (!row) return { success: false, data: null, message: `No open checks for ${engagement}.` }
+      n = row.check_number!
+    }
+    const info = db.prepare(
+      "UPDATE revenue_checks SET status='collected', collected_at=COALESCE(?, date('now')) " +
+      "WHERE engagement=? AND check_number=? AND status!='collected'"
+    ).run((input.date as string) || null, engagement, n)
+    if (!info.changes) return { success: false, data: { engagement, check_number: n }, message: `${engagement} #${n} not found or already collected.` }
+    const summary = db.prepare('SELECT * FROM v_revenue_summary WHERE engagement=?').get(engagement) as Record<string, unknown> | undefined
+    return { success: true, data: { engagement, check_number: n, summary }, message: `Logged ${engagement} check #${n} as collected.` }
+  } finally { db.close() }
+}
+
 const handlers: Record<string, (input: Record<string, unknown>) => ToolResult> = {
+  mark_revenue_check: markRevenueCheck,
   list_goals: listGoals,
   create_goal: createGoal,
   update_goal: updateGoal,
@@ -446,6 +517,7 @@ const handlers: Record<string, (input: Record<string, unknown>) => ToolResult> =
   complete_event: completeEvent,
   complete_event_by_title: completeEventByTitle,
   add_todo: addTodo,
+  correct_memory: correctMemory,
   complete_todo: completeTodo,
   whats_on_my_plate: whatsOnMyPlate,
   create_task: createTask,

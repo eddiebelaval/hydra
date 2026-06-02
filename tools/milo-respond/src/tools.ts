@@ -224,6 +224,19 @@ const taskTools: ClaudeTool[] = [
       required: ['task_id'],
     },
   },
+  {
+    name: 'mark_revenue_check',
+    description: "Log a payment/check as collected for a revenue engagement. Use when Eddie says a check came in or he got paid (e.g. 'the Rose check landed', 'D&B paid me'). Engagement slug is usually 'rose-dnb'. If he doesn't say which check number, omit it and the earliest still-due check is marked.",
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        engagement: { type: 'string', description: "Engagement slug, e.g. 'rose-dnb'" },
+        check_number: { type: 'number', description: 'Optional; defaults to the earliest due check' },
+        date: { type: 'string', description: 'Optional YYYY-MM-DD; defaults to today' },
+      },
+      required: ['engagement'],
+    },
+  },
 ]
 
 const memoryTools: ClaudeTool[] = [
@@ -276,6 +289,19 @@ const memoryTools: ClaudeTool[] = [
         memory_id: { type: 'number' },
       },
       required: ['memory_id'],
+    },
+  },
+  {
+    name: 'correct_memory',
+    description: "Record a correction when Eddie tells you something in your memory or the portfolio is STALE, WRONG, or ALREADY HAPPENED. Use this WHENEVER Eddie corrects you in the field -- 'that already shipped', 'that's old', 'wipe that', 'update that to X', 'no, it's actually Y'. The correction is injected at the TOP of every agent's brain (yours, HYDRA's, Ava's) and OVERRIDES the stale data IMMEDIATELY. Always call this instead of just agreeing -- agreeing forgets, this makes the fix stick across all agents. Confirm to Eddie that you've recorded it.",
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        correction: { type: 'string', description: 'What is actually true now -- the corrected fact, stated plainly. Required.' },
+        stale_claim: { type: 'string', description: 'The stale/wrong thing being superseded, in a few words (helps the override match).' },
+        topic: { type: 'string', description: 'Short topic tag, e.g. "profesa", "donato-brill", "homer".' },
+      },
+      required: ['correction'],
     },
   },
 ]

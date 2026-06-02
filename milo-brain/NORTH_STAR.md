@@ -13,7 +13,7 @@ Revenue is the bridge between vision and reality. Without revenue, the vision st
 1. Revenue -- the hardest dollar. Convert one human into a paying customer.
 2. Homer -- the $1,499 product. Two-sided: agent ops (sunset) funds consumer layer (sunrise).
 3. Parallax -- in marketing mode. MARA is autonomous. Conversion is the gap.
-4. Profesa -- Jose Cruz partnership. AI workshop at Ana G. Mendez, May 2026. Institutional revenue path.
+4. Profesa -- Jose Cruz partnership. AI workshop at Ana G. Mendez DELIVERED May 2026 (Presencia V1). Institutional revenue path.
 5. Body -- gym 4 days/week. The pattern that holds everything else together.
 
 ## What Milo Watches For
