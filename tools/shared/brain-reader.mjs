@@ -49,13 +49,23 @@ export const CORRECTIONS_PATH = path.join(COORDINATION_ROOT, '_CORRECTIONS.md')
 
 export function loadCorrections() {
   try {
-    const c = fs.readFileSync(CORRECTIONS_PATH, 'utf-8').trim()
-    if (!c) return ''
+    const lines = fs.readFileSync(CORRECTIONS_PATH, 'utf-8').split('\n')
+    // Active corrections are markdown bullets (the correct_memory tool appends
+    // "- **date** ..." blocks). Header / blockquote / "no active corrections"
+    // notes are not bullets, so a folded (cleared) file injects NOTHING.
+    const out = []
+    let capturing = false
+    for (const l of lines) {
+      if (/^\s*-\s+\S/.test(l)) { capturing = true; out.push(l) }
+      else if (capturing && /^\s+\S/.test(l)) { out.push(l) } // indented continuation
+      else capturing = false
+    }
+    if (out.length === 0) return ''
     return `## AUTHORITATIVE CORRECTIONS (most recent ground truth -- these OVERRIDE anything below that conflicts)
 
 Eddie corrected these in the field. If anything in the memory index or topic files contradicts a correction here, the correction wins. Never repeat a claim that a correction has superseded.
 
-${c.substring(0, 6000)}`
+${out.join('\n').substring(0, 6000)}`
   } catch {
     return ''
   }
