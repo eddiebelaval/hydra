@@ -1,0 +1,95 @@
+{
+  "brand": "Data Tech",
+  "slug": "datatech",
+  "legal_name": "Data Tech Inc.",
+  "version": "0.2.0",
+  "installed": "2026-06-12",
+  "mined": "2026-06-12",
+  "status": "active (owner buy-in 2026-06-12: Don Carlos + Margarita said 'this is what we want'; 50% deposit pending; Ecosystem tier likely)",
+  "mode": "MINE",
+  "design_authority": "Jose (Federation pod design lane). This genome captures a STARTING POINT mined from Jose's own draft (proposal v4 + DESIGN-REFERENCE.md). Jose owns final color; we build the structure, he colors it.",
+  "design": {
+    "palette": {
+      "orange": "#F05A28",
+      "orange_deck": "#F4621F",
+      "orange_dark": "#c94920",
+      "orange_light": "#ff8c5a",
+      "black": "#0e0e0e",
+      "near_black": "#0a0a0a",
+      "surface_dark": "#141414",
+      "surface_mid": "#1a1a1a",
+      "surface_raised": "#1c1c1c",
+      "white": "#f5f5f5",
+      "border": "rgba(255,255,255,0.08)",
+      "border_orange": "rgba(240,90,40,0.25)",
+      "muted": "rgba(255,255,255,0.42)"
+    },
+    "type": {
+      "display": "Bebas Neue, sans-serif",
+      "body": "DM Sans, system-ui, sans-serif",
+      "mono": "DM Mono, monospace"
+    },
+    "motifs": [
+      "full-bleed cinematic hero: golden-hour warehouse/truck/equipment photography (honest, DataTech scans trucks and boxes on arrival)",
+      "orange as a brand statement (luminous, Cloudflare-style), not just button accents",
+      "thin concentric arc/swoosh lines (golden-peach); orange footer band",
+      "monospace/technical nav accents (Terminal-Industries register)",
+      "an 'Ask DataTech' entry-point window: build the window in Phase 1, wire it to the intelligence layer in Phase 4",
+      "the orange 'D' / lightning-bolt 'T' logo stays"
+    ],
+    "anti": [
+      "busy tile-heavy grid (the old ecbrands storefront look)",
+      "list-only product pages with no imagery",
+      "badge clutter, urgency banners, countdown timers",
+      "emojis anywhere (id8Labs law; Hero Icons or none)",
+      "generic dashboard-vendor gray / glassmorphism"
+    ],
+    "references": {
+      "pro_target": "Cloudflare homepage (the client's own 'Version PRO' mockup is literally a Cloudflare screenshot, so this is documented client intent, not loose inspiration)",
+      "cinematic": "Terminal Industries (logistics yard OS, same subject matter, embedded 'Ask' AI field in nav)",
+      "baseline": "ecbrands demo (the conventional storefront being elevated; keep the substance, lose the clutter)"
+    }
+  },
+  "voice": {
+    "register": "confident B2B wholesale distributor: restrained, technical, premium. One statement, one action, lots of air. The antidote to the busy storefront.",
+    "languages": ["es", "en"],
+    "primary_language": "es",
+    "markets": ["Centro America", "Sur America", "Caribe Espanol (PR, RD)", "Caribe Ingles"],
+    "lexicon": [
+      "Tres decadas de confianza e innovacion",
+      "Crecer / Solucionar / Gestionar / Abastecer (deck growth pillars, usable as site copy)",
+      "Data Tech Inc., founded 1996, Miami FL"
+    ],
+    "anti": [
+      "marketing superlatives and hype",
+      "clutter copy / tile-grid density",
+      "em dashes, en dashes, emojis"
+    ]
+  },
+  "ethos": {
+    "positioning": "wholesale distributor + logistics hub for printing supplies/hardware and tech solutions across Latin America and the Caribbean. The Phase 1 facelift is the 'Hybrid' bridge between V2 (ecbrands) and 'Version PRO' (Oct 2026), planting a clean, confident, AI-credible brand the later phases pay off as an intelligence layer.",
+    "company_facts": {
+      "founded": 1996,
+      "hq": "Miami, FL",
+      "brand_share": "HP 55.84%, Samsung 12.31%, Lexmark 11.45%",
+      "growth": "+7.5% (2023-25), +10.3% Y/Y 24-25"
+    },
+    "serves": "in order: the client (Data Tech / Nixon), the distributor's customers across LatAm + Caribbean, the commercializable banner slots (e.g. Epson), id8Labs + the Federation pod",
+    "pod": "Federation pod with Jose: Jose = client/UX/design lane, Eddie = backend/arch/DB/infra, quarterback shared",
+    "phases": "Phase 1 facelift (Hybrid) now -> PRO launch Oct/Nov 2026; intelligence-layer 'Ask' wired in Phase 4",
+    "would_never": [
+      "ship the busy tile-grid clutter the facelift exists to retire",
+      "override Jose's color without his sign-off (design authority is his)",
+      "emojis in product or documents",
+      "fabricate brand-share, growth, or company facts (sourced from the corporate deck)"
+    ]
+  },
+  "eval": {
+    "golden_set": [
+      "engagements/datatech/DESIGN-REFERENCE.md (Jose's documented direction)",
+      "engagements/datatech/inbox-attachments/data-tech-proposal-phase1-2026-06-03-v4.html (Jose's latest proposal, source of hex + fonts)",
+      "engagements/datatech/snapshots/ (ref-cloudflare, ref-terminal-industries, ecbrands-demo, datatech-board)"
+    ],
+    "form_parity_threshold": "an asset fails on any anti-design hit (tile clutter, no-image product list, emoji), any color outside Jose's recolor, or any drift from the cinematic full-bleed direction. Compliance with Jose's design authority is binary, not scored."
+  }
+}

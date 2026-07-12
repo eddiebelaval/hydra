@@ -63,7 +63,15 @@ else:
 PYEOF
 )
 
-# ── Agent Workload ──
+# ── Agent Workload + Tasks + Wins (HYDRA v1 work layer) ──
+# Retired 2026-07-11 (~/.hydra/retired/RETIRED-2026-07-11.md). When the marker
+# exists these sections report the retirement instead of rendering relic rows.
+RETIRED_MARKER="$HOME/.hydra/retired/RETIRED-2026-07-11.md"
+if [[ -f "$RETIRED_MARKER" ]]; then
+    AGENTS_JSON="[]"
+    TASKS_JSON='{"high_priority": [], "blocked": [], "urgent_count": 0, "notification_count": 0, "retired": true, "retired_note": "HYDRA v1 work layer retired 2026-07-11; the living queue is the atlas wire (Morning Instrument)."}'
+    YESTERDAY_JSON="[]"
+else
 AGENTS_JSON=$(python3 << PYEOF
 import sqlite3, json
 conn = sqlite3.connect("$HYDRA_DB")
@@ -72,7 +80,6 @@ print(json.dumps([{"name": r[0], "pending": r[1], "wip": r[2], "done_today": r[3
 PYEOF
 )
 
-# ── High Priority + Blocked Tasks ──
 TASKS_JSON=$(python3 << PYEOF
 import sqlite3, json
 conn = sqlite3.connect("$HYDRA_DB")
@@ -96,7 +103,6 @@ print(json.dumps({
 PYEOF
 )
 
-# ── Yesterday's Wins ──
 YESTERDAY_JSON=$(python3 << PYEOF
 import sqlite3, json
 conn = sqlite3.connect("$HYDRA_DB")
@@ -108,6 +114,7 @@ rows = conn.execute("""
 print(json.dumps([{"agent": r[0], "title": r[1]} for r in rows]))
 PYEOF
 )
+fi
 
 # ── Project Activity (from brain-updater) ──
 PROJECT_ACTIVITY=""
@@ -136,11 +143,15 @@ if reports:
     if count > 0:
         signals["seventy_pct"] = count
 
-# Marketing streak
+# Marketing streak — only if the sensor has ever recorded a real day
+# (an epoch 1970 stamp means never-initialized; a plausible "0" would lie)
 streak_file = f"{logs_base}/marketing-check/.marketing-streak"
 if os.path.exists(streak_file):
     with open(streak_file) as f:
-        signals["marketing_streak"] = int(f.read().split(":")[0].strip() or "0")
+        raw = f.read().strip()
+    streak, _, stamp = raw.partition(":")
+    if stamp.strip() and not stamp.strip().startswith("1970"):
+        signals["marketing_streak"] = int(streak.strip() or "0")
 
 # Focus score
 focus_reports = sorted(glob.glob(f"{logs_base}/context-switch/report-*.md"), reverse=True)

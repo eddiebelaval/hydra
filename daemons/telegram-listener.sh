@@ -770,6 +770,19 @@ dispatch_command() {
 
     local response=""
 
+    # HYDRA v1 work layer retired 2026-07-11 (~/.hydra/retired/RETIRED-2026-07-11.md).
+    # The v1 task/agent commands answer with the retirement instead of relic data.
+    # Alive and untouched: status, costs, note:, activity, briefing, plan (priorities),
+    # ask/chat, llc, parallax, health, goals.
+    if [[ -f "$HOME/.hydra/retired/RETIRED-2026-07-11.md" ]]; then
+        case "$cmd_type" in
+            tasks|agents|notifications|approve|reject|complete|standup|mention|route)
+                send_response "HYDRA v1 work layer retired 2026-07-11. The living queue is the atlas wire - see the Morning Instrument (briefing command). Still live here: status, costs, note:, activity, briefing, plan, health, goals." "$message_id"
+                return 0
+                ;;
+        esac
+    fi
+
     case "$cmd_type" in
         status)
             response=$("$HYDRA_TOOLS/hydra-cli.sh" status 2>&1 | head -30 | sed 's/\x1b\[[0-9;]*m//g')

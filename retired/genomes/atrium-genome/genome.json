@@ -1,0 +1,86 @@
+{
+  "brand": "Atrium",
+  "slug": "atrium",
+  "version": "0.1.0",
+  "installed": "2026-06-10",
+  "status": "assembled",
+  "design": {
+    "palette": {
+      "paper": "#FAF8F4",
+      "ink": "#1A1714",
+      "muted": "#8A8378",
+      "line": "#E5E0D6",
+      "orange": "#FF6B35",
+      "card": "#FFFFFF",
+      "alert_wash": "#FFF3ED",
+      "commitment_tan": "#C9BFAE"
+    },
+    "type": {
+      "headline": "Fraunces 600",
+      "body": "Archivo 400-600",
+      "label": "Archivo Narrow 600 uppercase ls-0.08-0.12em",
+      "mono": "JetBrains Mono 400-500"
+    },
+    "motifs": [
+      "breathing orange dot (present and sensing)",
+      "type-flag cards with left accent bar by type",
+      "three-zone tide with decay opacity 1 / 0.85 / 0.45",
+      "hairline zone labels extending to the right edge"
+    ],
+    "anti": [
+      "emojis",
+      "dark dashboard skin",
+      "data-grid density",
+      "pure white field",
+      "second accent color",
+      "decorative gradients"
+    ]
+  },
+  "voice": {
+    "register": "plain declarative; calm facilitator who speaks rarely and is right; no hedging in product copy",
+    "languages": ["en (leads)", "es (first-class)"],
+    "lexicon": [
+      "a third participant",
+      "the board",
+      "foreground / midground / background",
+      "the board has a tide",
+      "earns",
+      "salience",
+      "leave-behind",
+      "Atrium is on the line",
+      "Hey Claude"
+    ],
+    "anti": [
+      "em or en dashes",
+      "AI-powered / revolutionary / supercharge / 10x",
+      "monitor / track / surveil as product verbs",
+      "users (they are participants)",
+      "promises ahead of the Trust Ladder"
+    ]
+  },
+  "ethos": {
+    "positioning": "the unbuilt middle between transcription tools and voice LLMs: a third participant that takes a position on what matters, in real time, in front of the room",
+    "serves": "id8Labs internal meetings (Case Zero), then the trusted inner circle by invite",
+    "values": [
+      "Visibility Principle: participant, never surveillance; consent upstream of capability",
+      "Trust Ladder: capabilities earned, not shipped; wrong items cost more than missed items",
+      "under-surface: an empty board is correct behavior",
+      "graded, not vibed: no salience change ships without the golden eval GREEN"
+    ],
+    "would_never": [
+      "hidden or asymmetric boards",
+      "uninvited interjection",
+      "full transcripts on screen",
+      "voice-out or cross-meeting memory before earned",
+      "remaining in a meeting without full consent"
+    ]
+  },
+  "eval": {
+    "golden_set": [
+      "live/eval/fixtures/partner-sync.json",
+      "live/eval/fixtures/client-demo.json",
+      "live/eval/fixtures/retraction-trap.json"
+    ],
+    "form_parity_threshold": "GREEN (one hallucination or trust violation is RED)"
+  }
+}

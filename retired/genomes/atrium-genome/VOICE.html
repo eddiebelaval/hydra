@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>VOICE: Atrium</title>
+<style>/* ══════════════════════════════════════════
+   SHIPPED. LITE — wiki article style.
+   Magazine register, reference density.
+   Single source of truth for id8 doc HTML.
+   ══════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,700;0,9..144,900;1,9..144,400;1,9..144,500&family=Archivo:wght@400;500;600;700&family=Archivo+Narrow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
+
+:root {
+  --orange: #FF6B35;
+  --ink: #0b0b0b;
+  --paper: #fafaf7;
+  --paper-shadow: #f2f0e8;
+  --paper-alt: #f6f4ed;
+  --body: #2a2a2a;
+  --muted: #5a5a5a;
+  --gray: #8a8a8a;
+  --hair: rgba(11, 11, 11, 0.12);
+  --hair-soft: rgba(11, 11, 11, 0.06);
+  --hair-hard: rgba(11, 11, 11, 0.22);
+  --disp: 'Fraunces', 'Times New Roman', serif;
+  --sans: 'Archivo', system-ui, sans-serif;
+  --narrow: 'Archivo Narrow', 'Archivo', sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+body {
+  background: var(--paper);
+  color: var(--body);
+  font-family: var(--sans);
+  min-height: 100vh;
+  position: relative;
+}
+
+::selection { background: var(--orange); color: #fff; }
+
+/* Paper grain — subtle. */
+body::before {
+  content: "";
+  position: fixed; inset: 0; pointer-events: none; z-index: 1000;
+  opacity: 0.05; mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='3'/><feColorMatrix values='0 0 0 0 0.02  0 0 0 0 0.02  0 0 0 0 0.02  0 0 0 0 .22 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* ─────────────────────────────────────────
+   PAGE SHELL
+   ───────────────────────────────────────── */
+.page { max-width: 720px; margin: 0 auto; padding: 64px 32px 128px; }
+
+/* ─────────────────────────────────────────
+   FOLIO HEADER — the kicker bar at the top
+   DOMAIN · TYPE         DATE
+   ───────────────────────────────────────── */
+.folio {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-bottom: 14px; margin-bottom: 36px;
+  border-bottom: 1px solid var(--ink);
+  font-family: var(--narrow);
+  font-size: 10px; font-weight: 600; letter-spacing: 0.28em;
+  text-transform: uppercase; color: var(--muted);
+}
+.folio-left b { color: var(--ink); font-weight: 700; }
+.folio-left .dot { color: var(--orange); }
+.folio-right { color: var(--gray); }
+
+/* ─────────────────────────────────────────
+   TITLE + DECK
+   ───────────────────────────────────────── */
+h1 {
+  font-family: var(--disp);
+  font-variation-settings: "opsz" 96;
+  font-weight: 500;
+  font-size: clamp(40px, 5.5vw, 56px);
+  line-height: 1.04;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+  margin: 0 0 18px;
+}
+.deck {
+  font-family: var(--disp);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 18px;
+  line-height: 1.45;
+  color: var(--muted);
+  margin: 0 0 28px;
+}
+
+/* ─────────────────────────────────────────
+   FRONTMATTER PILL (small mono block at top)
+   ───────────────────────────────────────── */
+.frontmatter {
+  background: var(--paper-alt);
+  border: 1px solid var(--hair);
+  padding: 14px 18px;
+  margin: 0 0 40px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.65;
+  color: var(--muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-radius: 0;
+}
+
+/* ─────────────────────────────────────────
+   HEADINGS
+   ───────────────────────────────────────── */
+h2 {
+  font-family: var(--disp);
+  font-variation-settings: "opsz" 36;
+  font-weight: 500;
+  font-size: 26px;
+  line-height: 1.18;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  margin: 56px 0 0;
+  padding-top: 24px;
+  padding-bottom: 8px;
+  border-top: 1px solid var(--hair);
+}
+h2::before {
+  content: attr(data-kicker);
+  display: block;
+  font-family: var(--narrow);
+  font-size: 10px; font-weight: 700; letter-spacing: 0.28em;
+  text-transform: uppercase; color: var(--gray);
+  margin-bottom: 10px;
+}
+h2 + p, h2 + ul, h2 + ol { margin-top: 18px; }
+h3 {
+  font-family: var(--disp);
+  font-variation-settings: "opsz" 24;
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 1.30;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  margin: 32px 0 12px;
+}
+
+/* ─────────────────────────────────────────
+   BODY
+   ───────────────────────────────────────── */
+p, ul, ol { font-family: var(--sans); font-size: 16px; line-height: 1.7; color: var(--body); margin: 0 0 18px; }
+ul, ol { padding-left: 1.4em; }
+li { margin: 6px 0; }
+li > p { margin: 0 0 8px; }
+
+strong { color: var(--ink); font-weight: 600; }
+em { font-style: italic; }
+
+a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--hair-hard);
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.15s;
+}
+a:hover { text-decoration-color: var(--orange); }
+
+/* Wikilinks — the dashed-underline marker, since they only resolve inside id8pedia. */
+.wikilink {
+  color: var(--ink);
+  border-bottom: 1px dashed var(--gray);
+  padding-bottom: 1px;
+  cursor: help;
+}
+
+/* Code */
+code {
+  font-family: var(--mono);
+  font-size: 0.88em;
+  background: var(--paper-shadow);
+  padding: 1px 6px;
+  border: 1px solid var(--hair);
+  color: var(--ink);
+  border-radius: 0;
+}
+pre {
+  background: var(--paper-shadow);
+  border: 1px solid var(--hair);
+  border-left: 3px solid var(--ink);
+  padding: 16px 18px;
+  overflow-x: auto;
+  margin: 0 0 24px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--ink);
+}
+pre code { background: transparent; border: none; padding: 0; font-size: inherit; }
+
+/* Blockquote — pull-quote register. */
+blockquote {
+  margin: 24px 0;
+  padding: 4px 0 4px 24px;
+  border-left: 3px solid var(--ink);
+  font-family: var(--disp);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 19px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+blockquote p { font-family: inherit; font-size: inherit; font-style: inherit; color: inherit; line-height: inherit; margin: 0 0 10px; }
+blockquote p:last-child { margin-bottom: 0; }
+
+/* Tables — editorial, hairline. */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 24px;
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+th, td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--hair);
+  vertical-align: top;
+}
+th {
+  font-family: var(--narrow);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink);
+  border-bottom: 1px solid var(--ink);
+  border-top: 1px solid var(--ink);
+  background: var(--paper-alt);
+}
+
+/* Horizontal rule — softer fade, magazine-like. */
+hr {
+  border: none;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--hair-hard) 20%, var(--hair-hard) 80%, transparent);
+  margin: 48px 0;
+}
+
+/* Drop cap (opt-in via frontmatter drop_cap: true). */
+.drop-cap > p:first-of-type::first-letter {
+  font-family: var(--disp);
+  font-variation-settings: "opsz" 144;
+  font-weight: 700;
+  font-size: 64px;
+  line-height: 0.85;
+  float: left;
+  padding: 6px 10px 0 0;
+  color: var(--ink);
+}
+
+/* ─────────────────────────────────────────
+   VISUAL LAYER — figures, mermaid, asides
+   ───────────────────────────────────────── */
+
+/* Figures: image + magazine-style caption. */
+.figure {
+  margin: 32px 0 28px;
+  padding: 0;
+}
+.figure img, .figure svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--hair);
+  background: var(--paper-alt);
+}
+.figure figcaption {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--hair);
+  font-family: var(--disp);
+  font-style: italic;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* Mermaid diagrams — paper-feel container, hairline frame. */
+.mermaid {
+  background: var(--paper-alt);
+  border: 1px solid var(--hair);
+  padding: 24px 18px;
+  margin: 32px 0;
+  font-family: var(--sans);
+  font-size: 14px;
+  text-align: center;
+  overflow-x: auto;
+  /* Before mermaid replaces the content, show the source dimmed so the
+     reader sees something on slow networks rather than a blank box. */
+  white-space: pre;
+  color: var(--muted);
+}
+.mermaid > svg {
+  background: transparent;
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Asides — the magazine sidebar box. */
+.aside {
+  background: var(--paper-alt);
+  border: 1px solid var(--hair);
+  border-left: 3px solid var(--ink);
+  padding: 18px 22px 14px;
+  margin: 28px 0;
+  font-family: var(--sans);
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--body);
+}
+.aside .aside-kicker {
+  font-family: var(--narrow);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--gray);
+  margin-bottom: 10px;
+}
+.aside p { font-family: inherit; font-size: inherit; line-height: inherit; color: inherit; margin: 0 0 10px; }
+.aside p:last-child { margin-bottom: 0; }
+.aside-stat { border-left-color: var(--orange); }
+.aside-stat .aside-kicker { color: var(--orange); }
+.aside-stat p strong { font-family: var(--disp); font-variation-settings: "opsz" 96; font-size: 36px; line-height: 1; display: block; margin-bottom: 4px; color: var(--ink); }
+.aside-warn { border-left-color: var(--orange); }
+.aside-warn .aside-kicker { color: var(--orange); }
+.aside-tip .aside-kicker { color: var(--ink); }
+.aside-important { border-left-color: var(--ink); }
+.aside-important .aside-kicker { color: var(--ink); }
+
+/* ─────────────────────────────────────────
+   FOOTER FOLIO — closing mark with ruler + dot
+   ───────────────────────────────────────── */
+.footfolio {
+  margin-top: 80px;
+  padding-top: 18px;
+  border-top: 1px solid var(--ink);
+  display: flex; align-items: center; gap: 12px;
+  font-family: var(--narrow);
+  font-size: 10px; font-weight: 600; letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--gray);
+}
+.footfolio .ruler { flex: 1; height: 1px; background: var(--hair); }
+.footfolio .dot { color: var(--orange); font-size: 14px; line-height: 1; }
+.footfolio b { color: var(--ink); font-weight: 700; }
+
+/* Print: keep readable, drop the grain. */
+@media print {
+  body::before { display: none; }
+  .page { padding: 24px; max-width: 100%; }
+  h1, h2, h3 { color: #000; }
+  a { color: #000; text-decoration: underline; }
+}
+</style>
+
+</head>
+<body>
+<article class="page ">
+<div class="folio"><div class="folio-left"><b>ID8LABS</b> <span class="dot">●</span></div><div class="folio-right"></div></div>
+<h1>VOICE: Atrium</h1>
+
+
+<blockquote><p>How it sounds. The gene the Build and Taste loops read for copy.</p></blockquote>
+<p>Status: ASSEMBLED from canon (VISION.md, README.md, shipped UI copy), 2026-06-10.</p>
+<h2>Register / tone</h2>
+<p>Plain declarative. Calm, present, unhurried; the register of a good facilitator who speaks rarely and is right when they do. Short sentences. States facts without hedging. Warm but never chummy.</p>
+<h2>Languages</h2>
+<p>English leads. Spanish is first-class, not a translation afterthought (the language toggle sits in the pre-join flow, es-US). Meeting rooms in this portfolio are bilingual; copy must survive both.</p>
+<h2>Lexicon (exact words)</h2>
+<ul><li>&quot;a third participant&quot; (the product, in one phrase)</li><li>&quot;the board&quot; (never &quot;the dashboard&quot;, never &quot;the feed&quot;)</li><li>foreground / midground / background (the zones; lowercase in prose)</li><li>&quot;the board has a tide&quot; (decay, in one image)</li><li>&quot;earns&quot;: the board fills as the conversation earns it; capabilities are earned, not shipped</li><li>&quot;salience&quot; (what the engine weighs)</li><li>&quot;leave-behind&quot; (what survives a meeting)</li><li>&quot;Atrium is on the line&quot; (the consent line, said out loud)</li><li>&quot;Hey Claude&quot; (the wake phrase; Atrium answers to Claude in the room)</li></ul>
+<h2>Do / don&#x27;t</h2>
+<ul><li>Do write UI copy as quiet fact: &quot;The board is empty. It fills as the conversation earns it.&quot;</li><li>Do attribute plainly: &quot;Jose will send the SOW by Friday.&quot; Owner first, no flourish.</li><li>Do say what Atrium does not do; the refusals are part of the product.</li><li>Don&#x27;t hedge (&quot;possibly&quot;, &quot;seems like&quot;) in anything Atrium itself displays.</li><li>Don&#x27;t anthropomorphize past participant (&quot;Atrium hears&quot; is fine; &quot;Atrium feels&quot; is never).</li></ul>
+<h2>Anti-voice (never say)</h2>
+<ul><li>No em dashes or en dashes anywhere a human reads. Use commas, periods, parentheses.</li><li>Never &quot;AI-powered&quot;, &quot;revolutionary&quot;, &quot;supercharge&quot;, &quot;10x&quot;, or any growth-hype register.</li><li>Never surveillance vocabulary as product verbs: monitor, track, surveil</li></ul>
+<p>  (sessions are &quot;saved&quot;, meetings are &quot;archived&quot;; the distinction is doctrinal).</p>
+<ul><li>Never &quot;users&quot; for the people in a meeting; they are participants.</li><li>Never promise memory or capabilities the Trust Ladder has not yet granted.</li></ul>
+<div class="footfolio"><span class="dot">●</span><b>id8labs</b><span class="ruler"></span><span>wiki</span></div>
+</article>
+
+<style>
+#rich-progress{position:fixed;top:0;left:0;height:3px;width:0;background:#1b4332;z-index:1000;transition:width .08s}
+#rich-toc{position:fixed;top:72px;right:22px;width:208px;max-height:74vh;overflow:auto;font-size:12.5px;line-height:1.5;padding:10px 14px;border-left:2px solid #c9b98f;background:rgba(250,250,247,.92);z-index:900}
+#rich-toc .toc-h{font-weight:700;letter-spacing:.05em;text-transform:uppercase;font-size:10.5px;color:#9a8866;margin-bottom:6px}
+#rich-toc a{display:block;color:#5a564e;text-decoration:none;padding:2px 0 2px 8px;margin-left:-8px;border-left:2px solid transparent}
+#rich-toc a.h3{padding-left:20px;font-size:12px;color:#7a756b}
+#rich-toc a.active{color:#1b4332;font-weight:600;border-left-color:#1b4332}
+@media(max-width:1180px){#rich-toc{display:none}}
+h2.rich-collapsible{cursor:pointer;user-select:none}
+h2.rich-collapsible::before{content:"\25be  ";color:#b6a274;font-size:.7em;vertical-align:middle}
+h2.rich-collapsed::before{content:"\25b8  "}
+article pre{position:relative}
+.rich-copy{position:absolute;top:6px;right:6px;font-size:10.5px;letter-spacing:.03em;border:1px solid #c9b98f;background:#fafaf7;color:#5a564e;border-radius:3px;padding:2px 8px;cursor:pointer;opacity:.45;transition:opacity .15s}
+article pre:hover .rich-copy{opacity:1}
+.rich-copy:hover{background:#1b4332;color:#fff;border-color:#1b4332}
+li.rich-task{list-style:none;margin-left:-18px;transition:opacity .15s}
+li.rich-task>input{margin-right:9px;transform:translateY(1px);cursor:pointer}
+</style>
+<script>
+document.addEventListener("DOMContentLoaded",function(){
+  function slug(t){return t.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");}
+  var heads=[].slice.call(document.querySelectorAll("article h2, article h3"));
+  heads.forEach(function(h){ if(!h.id) h.id=slug(h.textContent)||("s"+Math.random().toString(36).slice(2,7)); });
+
+  var bar=document.createElement("div"); bar.id="rich-progress"; document.body.appendChild(bar);
+
+  var links=[];
+  if(heads.length>=3){                                     // only worth a TOC on a real multi-section doc
+    var toc=document.createElement("nav"); toc.id="rich-toc";
+    var hd=document.createElement("div"); hd.className="toc-h"; hd.textContent="On this page"; toc.appendChild(hd);
+    heads.forEach(function(h){
+      var a=document.createElement("a"); a.href="#"+h.id;
+      a.textContent=h.textContent.replace(/^[▾▸]\s*/,"");
+      if(h.tagName==="H3") a.className="h3";
+      a.addEventListener("click",function(e){e.preventDefault();h.scrollIntoView({behavior:"smooth"});history.replaceState(null,"","#"+h.id);});
+      toc.appendChild(a);
+    });
+    document.body.appendChild(toc);
+    links=[].slice.call(toc.querySelectorAll("a"));
+  }
+
+  function onScroll(){
+    var de=document.documentElement, st=de.scrollTop||document.body.scrollTop, sh=de.scrollHeight-de.clientHeight;
+    bar.style.width=(sh>0?(st/sh*100):0)+"%";
+    var cur=null; heads.forEach(function(h){ if(h.getBoundingClientRect().top<130) cur=h.id; });
+    links.forEach(function(l){ l.classList.toggle("active", l.getAttribute("href")==="#"+cur); });
+  }
+  document.addEventListener("scroll",onScroll,{passive:true}); onScroll();
+
+  document.querySelectorAll("article pre").forEach(function(pre){
+    var code=pre.querySelector("code")||pre;
+    var b=document.createElement("button"); b.className="rich-copy"; b.type="button"; b.textContent="copy";
+    b.addEventListener("click",function(){
+      if(navigator.clipboard) navigator.clipboard.writeText(code.innerText);
+      b.textContent="copied"; setTimeout(function(){b.textContent="copy";},1200);
+    });
+    pre.appendChild(b);
+  });
+
+  var key="rich-tasks:"+location.pathname;
+  var saved={}; try{saved=JSON.parse(localStorage.getItem(key)||"{}");}catch(e){}
+  document.querySelectorAll("article li").forEach(function(li){
+    var first=li.firstChild;
+    if(!first||first.nodeType!==3) return;                 // must start with a text node
+    var m=first.nodeValue.match(/^\s*\[( |x|X)\]\s+([\s\S]*)$/);
+    if(!m) return;
+    li.classList.add("rich-task");
+    var id=(li.textContent||"").replace(/^\s*\[( |x|X)\]\s+/,"").trim().slice(0,80);
+    var done=(id in saved)?saved[id]:(m[1].toLowerCase()==="x");
+    first.nodeValue=m[2];                                  // strip the "[ ] " marker, keep the node
+    var cb=document.createElement("input"); cb.type="checkbox"; cb.checked=done;
+    li.insertBefore(cb, first);                            // checkbox before the trimmed text
+    li.style.opacity=done?".55":"1";
+    cb.addEventListener("change",function(){ saved[id]=cb.checked; try{localStorage.setItem(key,JSON.stringify(saved));}catch(e){} li.style.opacity=cb.checked?".55":"1"; });
+  });
+
+  document.querySelectorAll("article h2").forEach(function(h){
+    h.classList.add("rich-collapsible");
+    h.addEventListener("click",function(e){
+      if(e.target.tagName==="A") return;
+      var collapsed=h.classList.toggle("rich-collapsed"), el=h.nextElementSibling;
+      while(el && el.tagName!=="H2"){ el.style.display=collapsed?"none":""; el=el.nextElementSibling; }
+    });
+  });
+});
+</script>
+
+</body>
+</html>
