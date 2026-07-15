@@ -51,6 +51,23 @@ def is_sensor(label):
     return bool(SENSOR_PAT.search(label))
 
 
+# Internal atlases that have a deterministic, sensor-audit-honest surveyor: the
+# Gardener can AUTO re-survey these (never fake-stamp; the surveyor verifies real
+# state before it stamps). Others stay PROPOSE.
+ATLAS_SURVEYORS = {
+    "homer": os.path.join(HALOS, "homer", "atlas", "survey.py"),
+}
+
+
+def atlas_is_stale(path, today):
+    try:
+        with open(path) as f:
+            as_of = str(json.load(f).get("asOf", ""))[:10]
+        return (today - datetime.date.fromisoformat(as_of)).days > STALE_DAYS if as_of else True
+    except Exception:
+        return True
+
+
 def slug(s):
     return re.sub(r"[^a-z0-9]", "", str(s).lower())
 
@@ -211,12 +228,24 @@ def tend():
             escalated.append({"kind": "atlas", "item": a["name"],
                               "why": f"stale (asOf {a['asOf']})",
                               "route": "the engagement track"})
-        else:
-            # never fake-stamp: propose a real re-survey (sensor-audit law)
-            proposed.append({"kind": "atlas", "item": a["name"], "why": f"stale (asOf {a['asOf']})",
-                             "cause": "internal atlas not re-surveyed",
-                             "fix": "regenerate from real state (re-survey), then stamp asOf",
-                             "log": a["path"]})
+            continue
+        surveyor = ATLAS_SURVEYORS.get(slug(a["name"]))
+        if APPLY and surveyor and os.path.isfile(surveyor):
+            rc = subprocess.run([sys.executable, surveyor, "--apply"],
+                                capture_output=True, text=True, timeout=45).returncode
+            if rc == 0 and not atlas_is_stale(a["path"], today):
+                healed.append({"kind": "atlas", "item": a["name"], "action": "re-survey", "now": "asOf refreshed"})
+                continue
+            if rc == 3:
+                proposed.append({"kind": "atlas", "item": a["name"], "why": f"stale (asOf {a['asOf']})",
+                                 "cause": "the surveyor needs a human (Homer moved, or a gate to rule on)",
+                                 "fix": "re-author the bloom / clear the gate", "log": a["path"]})
+                continue
+        # no surveyor, or dry run: propose a real re-survey (never fake-stamp)
+        proposed.append({"kind": "atlas", "item": a["name"], "why": f"stale (asOf {a['asOf']})",
+                         "cause": "internal atlas not re-surveyed",
+                         "fix": "regenerate from real state (re-survey), then stamp asOf",
+                         "log": a["path"]})
 
     # today's sweeps: each real (--apply) pass leaves a mark on the day dial.
     report_path = os.path.join(OUT_DIR, "gardener-report.json")
