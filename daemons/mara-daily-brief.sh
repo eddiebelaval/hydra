@@ -160,7 +160,9 @@ esac
 # ============================================================================
 
 log "Sending brief: $(echo "$BRIEF" | wc -l) lines"
-"$NOTIFY" "urgent" "MARA" "$BRIEF"
+# notify-eddie dispatches to multiple channels and can return non-zero even when
+# the brief was delivered; under set -e that failed the job after a successful send.
+"$NOTIFY" "urgent" "MARA" "$BRIEF" || true
 
 touch "$MARA_SENT_FILE"
 log "Brief sent successfully."

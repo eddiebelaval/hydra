@@ -39,7 +39,16 @@ STALE_DAYS = 3
 # A label/atlas is CLIENT (escalate-only) if its slug carries one of these.
 CLIENT_HINTS = ("dnb", "donato", "brill", "datatech", "rose", "profesa", "lola", "nixon")
 
+# Sensor jobs report STATUS via exit code (YELLOW=1, RED=2). Their non-zero exit
+# is a reading, not a fault -- restarting them would silence a real signal, the
+# same sin as fake-stamping a stale atlas. Surface the finding; never kickstart.
+SENSOR_PAT = re.compile(r"(-health|-sentinel|\.health|\.sentinel)$")
+
 APPLY = "--apply" in sys.argv
+
+
+def is_sensor(label):
+    return bool(SENSOR_PAT.search(label))
 
 
 def slug(s):
@@ -171,10 +180,21 @@ def tend():
     # 1) the fleet
     for f in fleet_failures():
         label, code = f["label"], f["code"]
+        sensor = is_sensor(label)
         if is_client(label):
-            escalated.append({"kind": "fleet", "item": label,
-                              "why": f"exit {code}; client/job-dependent job",
-                              "route": "the engagement track (never auto-touched)"})
+            why = (f"exit {code} — status reading, not a broken job" if sensor
+                   else f"exit {code}; client/job-dependent job")
+            escalated.append({"kind": "reading" if sensor else "fleet", "item": label,
+                              "why": why, "route": "the engagement track (never auto-touched)"})
+            continue
+        if sensor:
+            # its exit code IS the reading; surface it, never restart to "fix"
+            logpath, _ = job_logs(label)
+            proposed.append({"kind": "reading", "item": label,
+                             "why": f"exit {code} — status sensor reporting non-nominal",
+                             "cause": "the exit code is the reading (not a fault)",
+                             "fix": "resolve the underlying finding; do not restart the sensor",
+                             "log": logpath})
             continue
         if APPLY:
             result = kickstart_and_verify(label)
@@ -198,15 +218,33 @@ def tend():
                              "fix": "regenerate from real state (re-survey), then stamp asOf",
                              "log": a["path"]})
 
+    # today's sweeps: each real (--apply) pass leaves a mark on the day dial.
+    report_path = os.path.join(OUT_DIR, "gardener-report.json")
+    prior = []
+    try:
+        with open(report_path) as f:
+            old = json.load(f)
+        if old.get("date") == today.isoformat():
+            prior = old.get("sweeps", [])
+    except Exception:
+        pass
+    sweeps = list(prior)
+    if APPLY:
+        sweeps.append({"at": now.strftime("%H:%M"), "h": round(now.hour + now.minute / 60.0, 3),
+                       "healed": len(healed), "proposed": len(proposed), "escalated": len(escalated)})
+    sweeps = sweeps[-12:]
+
     report = {
+        "date": today.isoformat(),
         "generatedAt": now.strftime("%Y-%m-%d %H:%M"),
         "applied": APPLY,
         "healed": healed,
         "proposed": proposed,
         "escalated": escalated,
+        "sweeps": sweeps,
         "summary": {"healed": len(healed), "proposed": len(proposed), "escalated": len(escalated)},
     }
-    with open(os.path.join(OUT_DIR, "gardener-report.json"), "w") as f:
+    with open(report_path, "w") as f:
         json.dump(report, f, ensure_ascii=False, indent=1)
 
     # readable twin
