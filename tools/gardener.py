@@ -56,6 +56,8 @@ def is_sensor(label):
 # state before it stamps). Others stay PROPOSE.
 ATLAS_SURVEYORS = {
     "homer": os.path.join(HALOS, "homer", "atlas", "survey.py"),
+    "engineroom": os.path.join(HALOS, "engine-room", "atlas", "survey.py"),
+    "id8labs": os.path.join(HALOS, "id8labs", "atlas", "survey.py"),
 }
 
 
