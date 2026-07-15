@@ -315,6 +315,12 @@ def main():
     except sqlite3.Error:
         pass
 
+    # --json: emit the living-sensor payload and stop. No template, no file writes.
+    # Used by Mission Control's /system route to render the flower live server-side.
+    if "--json" in sys.argv:
+        print(json.dumps(data, ensure_ascii=False))
+        return 0
+
     with open(TEMPLATE, encoding="utf-8") as f:
         template = f.read()
     payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
