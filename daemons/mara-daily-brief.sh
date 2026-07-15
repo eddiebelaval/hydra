@@ -88,8 +88,10 @@ TODAY_SECTION=$(awk -v day="$DAY_NAME" '
 
 if [[ -n "$TODAY_SECTION" ]]; then
     # Extract Eddie's actions
-    EDDIE_ACTIONS=$(echo "$TODAY_SECTION" | grep -E "^[0-9]+\." | head -5)
-    MARA_ACTIONS=$(echo "$TODAY_SECTION" | sed -n '/MARA Does/,/^$/p' | grep -E "^-" | head -5)
+    # grep finding nothing is a legitimate "no actions today" -- without || true,
+    # set -euo pipefail kills the whole brief here (the real cause of the exit-1s)
+    EDDIE_ACTIONS=$(echo "$TODAY_SECTION" | grep -E "^[0-9]+\." | head -5 || true)
+    MARA_ACTIONS=$(echo "$TODAY_SECTION" | sed -n '/MARA Does/,/^$/p' | grep -E "^-" | head -5 || true)
 
     if [[ -n "$EDDIE_ACTIONS" ]]; then
         BRIEF+="<b>YOUR ACTIONS TODAY:</b>"$'\n'

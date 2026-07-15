@@ -21,6 +21,7 @@ Usage:
   gardener.py --apply    # perform AUTO heals (internal, reversible only)
 """
 import datetime
+import fcntl
 import glob
 import json
 import os
@@ -32,9 +33,16 @@ import time
 HOME = os.path.expanduser("~")
 HYDRA = os.path.join(HOME, ".hydra")
 OUT_DIR = os.path.join(HYDRA, "briefings")
+STATE_DIR = os.path.join(HYDRA, "state")
 LAUNCH_AGENTS = os.path.join(HOME, "Library", "LaunchAgents")
 HALOS = os.path.join(HOME, "Development", "id8-halos", "clients")
+NOTIFY = os.path.join(HYDRA, "daemons", "notify-eddie.sh")
+LEDGER = os.path.join(OUT_DIR, "gardener-ledger.jsonl")
+LOCK = os.path.join(STATE_DIR, "gardener.lock")
+ESC_STATE = os.path.join(STATE_DIR, "gardener-escalated.json")
 STALE_DAYS = 3
+FLAP_HEALS = 3     # same fleet item kickstart-healed this many times in FLAP_DAYS = a masked fault
+FLAP_DAYS = 7
 
 # A label/atlas is CLIENT (escalate-only) if its slug carries one of these.
 CLIENT_HINTS = ("dnb", "donato", "brill", "datatech", "rose", "profesa", "lola", "nixon")
@@ -190,11 +198,60 @@ def stale_atlases(today):
     return out
 
 
+# ------------------------------------------------------- ledger + flap + notify
+def recent_heal_counts(days=FLAP_DAYS):
+    """Per-item count of fleet kickstart-heals in the last N days, off the ledger.
+    Atlas re-surveys are excluded: an atlas re-staling on the freshness clock is
+    normal maintenance; a daemon that needs repeated restarts is a masked fault."""
+    counts = {}
+    cutoff = (datetime.datetime.now() - datetime.timedelta(days=days)).isoformat()
+    try:
+        with open(LEDGER) as f:
+            for line in f:
+                try:
+                    e = json.loads(line)
+                except ValueError:
+                    continue
+                if e.get("ts", "") < cutoff:
+                    continue
+                for h in e.get("healed", []):
+                    if h.get("kind") == "fleet":
+                        counts[h["item"]] = counts.get(h["item"], 0) + 1
+    except OSError:
+        pass
+    return counts
+
+
+def notify_escalations(escalated):
+    """Deliver ESCALATE for real: notify Eddie when the escalated SET changes
+    (a new fire, not the same standing one three times a day). State survives
+    across passes; a resolved item drops off and re-notifies if it re-fires."""
+    current = {e["item"]: e.get("why", "") for e in escalated}
+    prev = {}
+    try:
+        with open(ESC_STATE) as f:
+            prev = json.load(f).get("items", {})
+    except Exception:
+        pass
+    new = {k: v for k, v in current.items() if k not in prev}
+    os.makedirs(STATE_DIR, exist_ok=True)
+    with open(ESC_STATE, "w") as f:
+        json.dump({"items": current, "at": datetime.datetime.now().isoformat()}, f)
+    if not new or not os.access(NOTIFY, os.X_OK):
+        return bool(new)
+    worst = "urgent" if any(re.search(r"\bp0\b|exit 2", w) for w in new.values()) else "high"
+    lines = [f"- {k}: {v}" for k, v in new.items()]
+    msg = "The Gardener escalates (new, not auto-touched):\n" + "\n".join(lines)
+    subprocess.run([NOTIFY, worst, "The Gardener", msg], capture_output=True, timeout=30)
+    return True
+
+
 # ------------------------------------------------------------------ the tend
 def tend():
     today = datetime.date.today()
     now = datetime.datetime.now()
     healed, proposed, escalated = [], [], []
+    flap = recent_heal_counts()
 
     # 1) the fleet
     for f in fleet_failures():
@@ -214,6 +271,14 @@ def tend():
                              "cause": "the exit code is the reading (not a fault)",
                              "fix": "resolve the underlying finding; do not restart the sensor",
                              "log": logpath})
+            continue
+        if flap.get(label, 0) >= FLAP_HEALS:
+            # restarts keep "working": that's a masked fault, not a heal
+            d = diagnose(label)
+            proposed.append({"kind": "flap", "item": label,
+                             "why": f"exit {code}, kickstart-healed {flap[label]}x in {FLAP_DAYS}d — flapping",
+                             "cause": "repeated restarts are masking a real fault",
+                             "fix": d["fix"], "log": d["log"]})
             continue
         if APPLY:
             result = kickstart_and_verify(label)
@@ -275,8 +340,19 @@ def tend():
         "sweeps": sweeps,
         "summary": {"healed": len(healed), "proposed": len(proposed), "escalated": len(escalated)},
     }
+    # ESCALATE delivers: notify on set-change only (never re-spam a standing fire)
+    if APPLY:
+        report["notified"] = notify_escalations(escalated)
+
     with open(report_path, "w") as f:
         json.dump(report, f, ensure_ascii=False, indent=1)
+
+    # append-only ledger: the audit trail the daily report can't be (it resets).
+    # Feeds flap detection and any future eval of the Gardener's own judgment.
+    with open(LEDGER, "a") as f:
+        f.write(json.dumps({"ts": now.isoformat(timespec="seconds"), "applied": APPLY,
+                            "healed": healed, "proposed": proposed, "escalated": escalated},
+                           ensure_ascii=False) + "\n")
 
     # readable twin
     md = [f"# The Gardener - {'tended' if APPLY else 'dry run'} {report['generatedAt']}",
@@ -294,6 +370,15 @@ def tend():
 
 
 if __name__ == "__main__":
+    # one gardener at a time: the scheduled pass and a "Tend" click must not
+    # both rewrite atlases/report concurrently. Non-blocking; the loser yields.
+    os.makedirs(STATE_DIR, exist_ok=True)
+    _lockf = open(LOCK, "w")
+    try:
+        fcntl.flock(_lockf, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        print("Gardener: another pass is running; yielding.")
+        sys.exit(0)
     r = tend()
     s = r["summary"]
     print(f"Gardener {'APPLIED' if r['applied'] else '(dry run)'}: "

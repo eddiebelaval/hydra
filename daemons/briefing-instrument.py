@@ -221,6 +221,29 @@ def gather_signals():
     return signals
 
 
+def gather_gardener(now):
+    """The watcher gets watched: the Gardener (the act layer) is itself a sensor.
+    If its last pass is older than the schedule tolerates (runs 8:50/14/20; max
+    normal gap ~13h), the garden has quietly stopped healing -- say so loudly.
+    Returns (attention_item_or_None, signal_line_or_None)."""
+    path = os.path.join(HYDRA, "briefings", "gardener-report.json")
+    STALE_HOURS = 18
+    try:
+        with open(path, encoding="utf-8") as f:
+            rep = json.load(f)
+        last = datetime.datetime.strptime(rep.get("generatedAt", ""), "%Y-%m-%d %H:%M")
+    except Exception:
+        return ({"who": "GARDENER", "text": "no gardener report at all: the act layer has never run or its report is unreadable",
+                 "note": "the watcher is not watching · check com.id8labs.gardener"}, None)
+    age_h = (now - last).total_seconds() / 3600.0
+    if age_h > STALE_HOURS:
+        return ({"who": "GARDENER", "text": f"last tending pass {age_h:.0f}h ago (> {STALE_HOURS}h): the garden has quietly stopped healing",
+                 "note": "the watcher is not watching · check com.id8labs.gardener"}, None)
+    s = rep.get("summary", {})
+    return (None, f"Gardener: last pass {rep.get('generatedAt', '?')[-5:]} · "
+                  f"healed {s.get('healed', 0)} · to tend {s.get('proposed', 0)} · escalated {s.get('escalated', 0)}")
+
+
 def gather_activity():
     brain = os.path.join(HYDRA, "TECHNICAL_BRAIN.md")
     if not os.path.isfile(brain):
@@ -292,6 +315,14 @@ def main():
             attention.append({"who": "FLEET", "text": f"{f_['label']} last exit {f_['code']}",
                               "note": "launchctl list · a failing job is nobody's petal no longer"})
 
+    # the watcher gets watched: Gardener liveness is itself a sensor
+    g_att, g_sig = gather_gardener(now)
+    if g_att:
+        attention.append(g_att)
+    signals = gather_signals()
+    if g_sig:
+        signals.append(g_sig)
+
     data = {
         "date": date_str,
         "dayName": today.strftime("%A"),
@@ -300,7 +331,7 @@ def main():
         "attention": attention,
         "lines": lines,
         "fleet": {"total": fleet["total"], "failing": len(fleet["failing"])},
-        "signals": gather_signals(),
+        "signals": signals,
         "projectActivity": gather_activity(),
         "schedule": gather_schedule(),
     }
