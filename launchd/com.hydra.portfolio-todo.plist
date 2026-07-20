@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.hydra.portfolio-todo</string>
+
+    <key>Comment</key>
+    <string>Portfolio TODO.md staleness ([active]&gt;14d-&gt;[review]) + brain render into GOALS.md - daily 5:35 AM</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Users/eddiebelaval/.hydra/daemons/portfolio-todo.py</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>5</integer>
+        <key>Minute</key>
+        <integer>35</integer>
+    </dict>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/eddiebelaval</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/eddiebelaval/Library/Logs/claude-automation/portfolio-todo/launchd-stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/eddiebelaval/Library/Logs/claude-automation/portfolio-todo/launchd-stderr.log</string>
+
+    <key>TimeOut</key>
+    <integer>60</integer>
+
+    <key>RunAtLoad</key>
+    <false/>
+    <key>Nice</key>
+    <integer>12</integer>
+</dict>
+</plist>

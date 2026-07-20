@@ -17,12 +17,37 @@
 
 ---
 
+## Portfolio TODO (auto-updated)
+
+<!-- PORTFOLIO-TODO:START -->
+**Universal list:** `~/Development/id8/TODO.md` — active: 6 | archived: 1 | done: 1 | note: 1 | proposed: 1 | review: 5 | 5 flipped to review today.
+
+**Active:**
+- Confirm the full Fidelity ACH account number before any outbound use
+- Send Rose + Jose ACH-switch emails (drafted in Mail, held for gate)
+- Add Fidelity as the Spark (Capital One) card payment source
+- Move the ~$800 CO buffer → Fidelity (EFT-ready now)
+- After 7/27 Spark autopay clears (last CO pull), switch card autopay funding CO → Fidelity for August
+- Close Capital One CHECKING (keep the Spark card)
+
+**Needs review (idle / flagged):**
+- Homer operational — Gus + Arena can test deals
+- Monthly revenue target — rolling forward (March unmet, pushing into April+)
+- Parallax: grow paid user base
+- 90day: stay on contract (cashflow stability)
+- Parallax maintenance pass
+
+*Auto-updated 2026-07-20 at 19:26*
+<!-- PORTFOLIO-TODO:END -->
+
+---
+
 ## Monthly Focus (auto-updated)
 
 <!-- GOALS-UPDATER:START -->
 - **February 2026:** HOMER - Q1 goal of 2-3 paying users, focus on product-market fit and user onboarding
 
-*Auto-updated 2026-04-27 at 06:05*
+*Auto-updated 2026-07-20 at 06:05*
 <!-- GOALS-UPDATER:END -->
 
 ---
@@ -32,13 +57,12 @@
 <!-- GOALS-UPDATER:HEALTH:START -->
 ### Project Activity
 **Mission Control**
-- Shipped **flight-deck system** with living-review link integration
-- Executed **SQL migration strategy** (Option A) and updated task states
-- Implemented **PII remediation** with scrub audit and Gmail retrieval tasks
-- Wired **Homer execution layer** into master todo surface
-- Integrated **Golden Sample Plan** 8-step sequence into task management workflow
+- Added **localhost guard** for route validation and system integrity
+- Implemented **Gardener sweeps** visualization on day dial display
+- Introduced **Gardener** as core act layer for flower architecture
+- Established **/system** as central **flower of chains** with sensor wire integration
 
-*Auto-updated 2026-04-27 at 06:05*
+*Auto-updated 2026-07-20 at 06:05*
 <!-- GOALS-UPDATER:HEALTH:END -->
 
 ---
@@ -48,9 +72,9 @@
 This section is auto-populated from Eddie's daily priority selections via the morning planner.
 
 <!-- GOALS-UPDATER:PRIORITIES:START -->
-- 2026-04-24: 3. [unset] [pending]  |  2. finalize all layouts by end of day [pending]  |  1. organize workshop into pods and articles [pending]
+*No priorities recorded in the last 7 days.*
 
-*Auto-updated 2026-04-27 at 06:05*
+*Auto-updated 2026-07-20 at 06:05*
 <!-- GOALS-UPDATER:PRIORITIES:END -->
 
 ---
