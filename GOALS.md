@@ -20,7 +20,7 @@
 ## Portfolio TODO (auto-updated)
 
 <!-- PORTFOLIO-TODO:START -->
-**Universal list:** `~/Development/id8/TODO.md` — active: 6 | archived: 1 | done: 1 | note: 1 | proposed: 1 | review: 5 | 5 flipped to review today.
+**Universal list:** `~/Development/id8/TODO.md` — active: 8 | archived: 4 | done: 1 | note: 1 | proposed: 1.
 
 **Active:**
 - Confirm the full Fidelity ACH account number before any outbound use
@@ -29,15 +29,10 @@
 - Move the ~$800 CO buffer → Fidelity (EFT-ready now)
 - After 7/27 Spark autopay clears (last CO pull), switch card autopay funding CO → Fidelity for August
 - Close Capital One CHECKING (keep the Spark card)
+- Homer re-entry — Move 2 headless engine extraction (patient bet)
+- Reach Cashflow+ (~$3,200/mo recurring) and stay there
 
-**Needs review (idle / flagged):**
-- Homer operational — Gus + Arena can test deals
-- Monthly revenue target — rolling forward (March unmet, pushing into April+)
-- Parallax: grow paid user base
-- 90day: stay on contract (cashflow stability)
-- Parallax maintenance pass
-
-*Auto-updated 2026-07-20 at 19:26*
+*Auto-updated 2026-07-20 at 19:45*
 <!-- PORTFOLIO-TODO:END -->
 
 ---
