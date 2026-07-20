@@ -20,7 +20,7 @@
 ## Portfolio TODO (auto-updated)
 
 <!-- PORTFOLIO-TODO:START -->
-**Universal list:** `~/Development/id8/TODO.md` — active: 8 | archived: 4 | done: 1 | note: 1 | proposed: 1.
+**Universal list:** `~/Development/id8/TODO.md` — active: 9 | archived: 4 | done: 1 | note: 1 | proposed: 1.
 
 **Active:**
 - Confirm the full Fidelity ACH account number before any outbound use
@@ -31,8 +31,9 @@
 - Close Capital One CHECKING (keep the Spark card)
 - Homer re-entry — Move 2 headless engine extraction (patient bet)
 - Reach Cashflow+ (~$3,200/mo recurring) and stay there
+- Redact before open-sourcing HYDRA (hard gate)
 
-*Auto-updated 2026-07-20 at 19:45*
+*Auto-updated 2026-07-20 at 19:52*
 <!-- PORTFOLIO-TODO:END -->
 
 ---

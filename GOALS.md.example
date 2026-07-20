@@ -1,0 +1,49 @@
+# HYDRA Goals
+
+<!--
+  PUBLIC TEMPLATE. The live GOALS.md is private (personal + financial content) and is
+  auto-rewritten daily by goals-updater.sh and portfolio-todo.py. In the public repo this
+  .example ships instead; the daemons regenerate the real file locally on first run.
+  Keep this file free of real numbers, revenue, burn, client names, or personal goals.
+-->
+
+## Goals
+
+### Primary
+- **<your primary goal>.** One-line description of the flagship objective.
+
+### Secondary
+- **<secondary goal>.** Short description.
+
+---
+
+## Monthly Focus (auto-updated)
+
+<!-- GOALS-UPDATER:START -->
+*Populated from the `monthly_commitments` table by goals-updater.sh.*
+<!-- GOALS-UPDATER:END -->
+
+---
+
+## Project Health (auto-updated)
+
+<!-- GOALS-UPDATER:HEALTH:START -->
+*Populated from brain-updater activity + reflector patterns.*
+<!-- GOALS-UPDATER:HEALTH:END -->
+
+---
+
+## Priority History
+
+<!-- GOALS-UPDATER:PRIORITIES:START -->
+*Populated from the `daily_priorities` table (last 7 days).*
+<!-- GOALS-UPDATER:PRIORITIES:END -->
+
+---
+
+## Portfolio TODO (auto-updated)
+
+<!-- PORTFOLIO-TODO:START -->
+*Populated from the portfolio TODO list by portfolio-todo.py — active items, review queue,
+and staleness flips. No real content in the template.*
+<!-- PORTFOLIO-TODO:END -->
