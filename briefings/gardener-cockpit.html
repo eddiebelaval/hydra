@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>The Gardener. — Cockpit</title>
+<!--
+  Gardener Cockpit -- the tender's own home. Reads gardener-cockpit-data.js
+  (window.GARDENER_COCKPIT), written deterministically by gardener-cockpit-scan.py
+  after every tend. id8Labs Editorial Design System v3.0 tokens; no shadows, no
+  glows, no gradients, light only. Green is earned (healed). Crimson is your lane
+  (escalated). Teal marks the human. Freshness is stated, never faked.
+-->
+<style>
+  :root {
+    --paper:#fafaf7; --paper-shadow:#f2f0e8; --ink:#0b0b0b; --body:#2a2a2a;
+    --muted:#5a5a5a; --hair:#d6d3c9; --hair-hard:#b4afa0;
+    --orange:#ff6b35; --teal:#2a8d83; --crimson:#b3261e; --green:#2f7d4a;
+    --font-serif:"Fraunces","Iowan Old Style",Palatino,Georgia,serif;
+    --font-sans:"Archivo","Avenir Next","Helvetica Neue",system-ui,sans-serif;
+    --font-narrow:"Archivo Narrow","Arial Narrow","Avenir Next Condensed",sans-serif;
+    --font-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    background:var(--paper); color:var(--body); font-family:var(--font-sans);
+    font-size:15px; line-height:1.6;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  }
+  .well { max-width:1040px; margin:0 auto; padding:0 32px 72px; }
+
+  /* folio */
+  .folio { display:flex; align-items:baseline; gap:16px; padding:20px 0 14px; border-bottom:1px solid var(--hair); }
+  .masthead { font-family:var(--font-serif); font-size:24px; font-weight:700; color:var(--ink); letter-spacing:-0.3px; }
+  .masthead i { font-style:normal; color:var(--orange); }
+  .folio-credit { font-size:13px; color:var(--muted); padding-left:16px; border-left:1px solid var(--hair); }
+  .folio-right { margin-left:auto; font-family:var(--font-narrow); font-size:11px; font-weight:600; letter-spacing:2px; text-transform:uppercase; color:var(--muted); text-align:right; }
+  .folio-right b { color:var(--ink); font-weight:700; }
+  .folio-right .stale { color:var(--crimson); }
+
+  /* the words */
+  .head { text-align:center; padding:34px 0 12px; }
+  .kicker { font-family:var(--font-narrow); font-size:12px; font-weight:600; letter-spacing:3px; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:10px; }
+  h1 { font-family:var(--font-serif); font-size:34px; font-weight:700; color:var(--ink); letter-spacing:-0.5px; }
+  .dek { max-width:660px; margin:12px auto 0; font-size:15px; color:var(--muted); }
+  .dek b { color:var(--body); font-weight:600; }
+
+  /* vitals */
+  .vitals { display:flex; justify-content:center; flex-wrap:wrap; gap:0; margin:26px 0 8px; border-top:1px solid var(--hair); border-bottom:1px solid var(--hair); }
+  .vital { padding:16px 26px; text-align:center; border-right:1px solid var(--hair); }
+  .vital:last-child { border-right:none; }
+  .vital .n { font-family:var(--font-serif); font-size:30px; font-weight:700; color:var(--ink); line-height:1; }
+  .vital .n.green { color:var(--green); } .vital .n.crimson { color:var(--crimson); } .vital .n.orange { color:var(--orange); }
+  .vital .l { font-family:var(--font-narrow); font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-top:8px; }
+
+  /* section device: 2px ink rule + label + italic note */
+  section { margin-top:44px; }
+  .srule { height:2px; background:var(--ink); }
+  .slabel { font-family:var(--font-narrow); font-size:13px; font-weight:700; letter-spacing:2.5px; text-transform:uppercase; color:var(--ink); margin-top:10px; }
+  .snote { font-family:var(--font-serif); font-style:italic; font-size:14px; color:var(--muted); margin-top:2px; margin-bottom:18px; }
+
+  /* live: three lanes */
+  .lanes { display:grid; grid-template-columns:1fr 1fr 1fr; gap:20px; }
+  @media (max-width:820px){ .lanes { grid-template-columns:1fr; } }
+  .lane h3 { font-family:var(--font-narrow); font-size:12px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; padding-bottom:8px; border-bottom:2px solid var(--hair); }
+  .lane.heal h3 { color:var(--green); border-bottom-color:var(--green); }
+  .lane.prop h3 { color:var(--ink); }
+  .lane.esc h3 { color:var(--crimson); border-bottom-color:var(--crimson); }
+  .lane h3 .c { float:right; font-family:var(--font-mono); color:var(--muted); }
+  .card { padding:11px 0; border-bottom:1px solid var(--hair); }
+  .card .item { font-family:var(--font-mono); font-size:12.5px; color:var(--ink); word-break:break-word; }
+  .card .why { font-size:13px; color:var(--body); margin-top:3px; }
+  .card .fix { font-size:12.5px; color:var(--muted); margin-top:3px; }
+  .card .fix b { color:var(--teal); font-weight:600; font-variant:small-caps; letter-spacing:0.5px; }
+  .kind { display:inline-block; font-family:var(--font-narrow); font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--muted); border:1px solid var(--hair-hard); border-radius:2px; padding:0 5px; margin-right:6px; vertical-align:1px; }
+  .empty { color:var(--muted); font-style:italic; font-family:var(--font-serif); padding:11px 0; }
+
+  /* day dial — circular 24h clock face, ported from the briefing bloom */
+  .dial { margin-top:30px; text-align:center; }
+  .dial svg { width:300px; max-width:100%; height:auto; display:block; margin:0 auto; }
+  .dial-cap { font-family:var(--font-narrow); font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin-top:8px; }
+
+  /* chronic + escalation tables */
+  table { width:100%; border-collapse:collapse; }
+  th { font-family:var(--font-narrow); font-size:11px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); text-align:left; padding:8px 10px; border-bottom:1px solid var(--hair-hard); }
+  td { padding:9px 10px; border-bottom:1px solid var(--hair); font-size:13px; vertical-align:top; }
+  td.mono { font-family:var(--font-mono); font-size:12.5px; color:var(--ink); }
+  td.num { font-family:var(--font-mono); text-align:right; color:var(--body); }
+  .pill { display:inline-block; font-family:var(--font-narrow); font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; padding:1px 7px; border-radius:2px; }
+  .pill.on { background:var(--crimson); color:#fff; } .pill.off { background:var(--paper-shadow); color:var(--muted); }
+
+  /* trend */
+  .trend { display:flex; align-items:flex-end; gap:4px; height:120px; padding-top:8px; border-bottom:1px solid var(--hair-hard); }
+  .bar { flex:1; position:relative; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; min-width:6px; }
+  .bar .stk { width:100%; background:var(--hair-hard); }
+  .bar .cap { width:100%; height:3px; background:var(--green); }
+  .bar .esc { width:100%; height:3px; background:var(--crimson); }
+  .trend-x { display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:10px; color:var(--muted); margin-top:6px; }
+  .legend { display:flex; gap:18px; margin-top:14px; font-family:var(--font-narrow); font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); }
+  .legend i { display:inline-block; width:10px; height:10px; margin-right:5px; vertical-align:-1px; }
+
+  /* colophon */
+  .colophon { margin-top:52px; padding-top:16px; border-top:2px solid var(--ink); font-size:12.5px; color:var(--muted); }
+  .colophon code { font-family:var(--font-mono); font-size:11.5px; color:var(--body); }
+  .colophon .row { margin-top:5px; }
+</style>
+</head>
+<body>
+<div class="well">
+  <div class="folio">
+    <span class="masthead">The Gardener<i>.</i></span>
+    <span class="folio-credit">Cockpit — one who tends all</span>
+    <span class="folio-right" id="folioRight"></span>
+  </div>
+
+  <div class="head">
+    <span class="kicker">The tender, made visible</span>
+    <h1>What the garden needed, and what got tended</h1>
+    <p class="dek">The Gardener reads the same living sensors the flower does, then <b>acts</b>:
+      it <b>heals</b> what's internal and reversible, <b>proposes</b> what needs a hand, and
+      <b>escalates</b> what's yours to rule. Read it in one glance — green is already handled,
+      the crimson lane is the only thing asking for you.</p>
+  </div>
+
+  <div class="vitals" id="vitals"></div>
+
+  <section>
+    <div class="srule"></div>
+    <div class="slabel">Live — this pass</div>
+    <div class="snote">Right now, off the latest tend. Healed is done; proposed is the standing queue; escalated is your lane.</div>
+    <div class="lanes" id="lanes"></div>
+    <div class="dial">
+      <svg id="dial" viewBox="0 0 320 320" aria-hidden="true"></svg>
+      <div class="dial-cap" id="dialCap"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="srule"></div>
+    <div class="slabel">Chronic — what won't clear</div>
+    <div class="snote">The ledger's memory. A proposal standing across many passes is a hand-fix owed; a job healed again and again is a masked fault, not a heal.</div>
+    <div id="chronic"></div>
+  </section>
+
+  <section>
+    <div class="srule"></div>
+    <div class="slabel">Escalations — your lane, over time</div>
+    <div class="snote">Every item that ever crossed into your lane, with how long it stood. Ongoing ones are still waiting on you.</div>
+    <div id="escalations"></div>
+  </section>
+
+  <section>
+    <div class="srule"></div>
+    <div class="slabel">Trend — the standing queue over time</div>
+    <div class="snote">Each bar is a day's end-of-day proposed queue. A green cap means a heal landed that day; a crimson cap means something escalated.</div>
+    <div class="trend" id="trend"></div>
+    <div class="trend-x" id="trendX"></div>
+    <div class="legend">
+      <span><i style="background:var(--hair-hard)"></i>Proposed (standing)</span>
+      <span><i style="background:var(--green)"></i>Healed that day</span>
+      <span><i style="background:var(--crimson)"></i>Escalated that day</span>
+    </div>
+  </section>
+
+  <div class="colophon" id="colophon"></div>
+</div>
+
+<script src="gardener-cockpit-data.js"></script>
+<script>
+(function () {
+  var D = window.GARDENER_COCKPIT;
+  var root = document.querySelector('.well');
+  if (!D) {
+    root.innerHTML = '<p style="font-family:var(--font-serif);font-style:italic;color:var(--crimson);padding:40px 0">' +
+      'No cockpit data. Run <code>gardener-cockpit-scan.py</code> to write gardener-cockpit-data.js beside this page.</p>';
+    return;
+  }
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>]/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]); }); };
+
+  // ---- folio (freshness, honest) ----
+  var f = D.freshness || {};
+  var age = f.ageHours == null ? '?' : f.ageHours + 'h';
+  document.getElementById('folioRight').innerHTML =
+    'Tended <b>' + esc(f.generatedAt) + '</b><br>' +
+    (f.stale ? '<span class="stale">STALE — a scheduled tend was missed (' + age + ')</span>'
+             : 'fresh · ' + age + ' ago · ' + (D.cadence || []).join(' / '));
+
+  // ---- vitals ----
+  var s = D.live.summary || {};
+  var vit = [
+    { n: s.healed || 0, l: 'healed', c: (s.healed ? 'green' : '') },
+    { n: s.proposed || 0, l: 'proposed', c: '' },
+    { n: s.escalated || 0, l: 'escalated', c: (s.escalated ? 'crimson' : '') },
+    { n: (D.chronic.stuck || []).length, l: 'stuck', c: '' },
+    { n: (D.ledger || {}).passes || 0, l: 'passes logged', c: '' }
+  ];
+  document.getElementById('vitals').innerHTML = vit.map(function (v) {
+    return '<div class="vital"><div class="n ' + v.c + '">' + v.n + '</div><div class="l">' + v.l + '</div></div>';
+  }).join('');
+
+  // ---- live lanes ----
+  function card(e, withFix) {
+    var h = '<div class="card"><div class="item"><span class="kind">' + esc(e.kind) + '</span>' + esc(e.item) + '</div>';
+    if (e.why) h += '<div class="why">' + esc(e.why) + '</div>';
+    if (e.now) h += '<div class="why">' + esc(e.now) + '</div>';
+    if (withFix && e.fix) h += '<div class="fix"><b>fix</b> ' + esc(e.fix) + '</div>';
+    if (e.route) h += '<div class="fix"><b>route</b> ' + esc(e.route) + '</div>';
+    return h + '</div>';
+  }
+  function lane(cls, title, arr, withFix, emptyMsg) {
+    var body = (arr && arr.length) ? arr.map(function (e) { return card(e, withFix); }).join('')
+                                   : '<div class="empty">' + emptyMsg + '</div>';
+    return '<div class="lane ' + cls + '"><h3>' + title + '<span class="c">' + (arr ? arr.length : 0) + '</span></h3>' + body + '</div>';
+  }
+  document.getElementById('lanes').innerHTML =
+    lane('heal', 'Healed', D.live.healed, false, 'nothing needed healing') +
+    lane('prop', 'Proposed', D.live.proposed, true, 'queue clear') +
+    lane('esc', 'Escalated', D.live.escalated, false, 'nothing in your lane');
+
+  // ---- day dial — circular 24h clock face, ported from the briefing bloom ----
+  (function () {
+    // tokens (read straight from the cockpit :root, no invented colors)
+    var INK = '#0b0b0b', BODY = '#2a2a2a', MUTED = '#5a5a5a',
+        HAIR = '#d6d3c9', HAIRHARD = '#b4afa0',
+        ORANGE = '#ff6b35', GREEN = '#2f7d4a', CRIMSON = '#b3261e';
+    var CX = 160, CY = 160, R_DAY = 118, R_HUB = 34;
+    // midnight at top (0h = 12 o'clock), clockwise — matches the briefing
+    function hourAngle(h) { return (h / 24) * 360; }
+    function polar(angle, r) {
+      var a = (angle - 90) * Math.PI / 180;
+      return [CX + r * Math.cos(a), CY + r * Math.sin(a)];
+    }
+    function f(n) { return Math.round(n * 100) / 100; }
+    var svg = '';
+
+    // full 24h ring (hairline) + business-hours 8-18 arc in ink
+    svg += '<circle cx="' + CX + '" cy="' + CY + '" r="' + R_DAY + '" fill="none" stroke="' + HAIR + '" stroke-width="1"/>';
+    var b0 = polar(hourAngle(8), R_DAY), b1 = polar(hourAngle(18), R_DAY);
+    svg += '<path d="M ' + f(b0[0]) + ' ' + f(b0[1]) + ' A ' + R_DAY + ' ' + R_DAY +
+           ' 0 0 1 ' + f(b1[0]) + ' ' + f(b1[1]) + '" fill="none" stroke="' + INK + '" stroke-width="2.4" stroke-linecap="round"/>';
+
+    // hour ticks — cardinals (0/6/12/18) heavier, labeled inside
+    for (var h = 0; h < 24; h++) {
+      var card = h % 6 === 0, ang = hourAngle(h);
+      var pin = polar(ang, R_DAY - (card ? 7 : 4));
+      var pout = polar(ang, R_DAY + (card ? 5 : 2));
+      svg += '<line x1="' + f(pin[0]) + '" y1="' + f(pin[1]) + '" x2="' + f(pout[0]) + '" y2="' + f(pout[1]) +
+             '" stroke="' + INK + '" stroke-width="' + (card ? 1.3 : 1) + '" opacity="' + (card ? 0.85 : 0.35) + '"/>';
+      if (card) {
+        var pl = polar(ang, R_DAY - 18);
+        svg += '<text x="' + f(pl[0]) + '" y="' + f(pl[1] + 3) + '" fill="' + BODY +
+               '" font-size="9" font-family="var(--font-mono)" text-anchor="middle">' + (h === 0 ? '0H' : h + 'H') + '</text>';
+      }
+    }
+
+    // scheduled cadence → open rings on the dial
+    (D.cadence || []).forEach(function (t) {
+      var hh = parseInt(t.split(':')[0], 10) + parseInt(t.split(':')[1], 10) / 60;
+      var p = polar(hourAngle(hh), R_DAY);
+      svg += '<circle cx="' + f(p[0]) + '" cy="' + f(p[1]) + '" r="4" fill="' + '#fafaf7' + '" stroke="' + MUTED + '" stroke-width="1.2"/>';
+    });
+
+    // real passes → filled dots (green healed / crimson escalated / else orange), time label outside
+    (D.live.sweeps || []).forEach(function (sw) {
+      var col = sw.escalated ? CRIMSON : (sw.healed ? GREEN : ORANGE);
+      var p = polar(hourAngle(sw.h), R_DAY);
+      var pl = polar(hourAngle(sw.h), R_DAY + 15);
+      svg += '<circle cx="' + f(p[0]) + '" cy="' + f(p[1]) + '" r="5" fill="' + col + '"/>';
+      svg += '<text x="' + f(pl[0]) + '" y="' + f(pl[1] + 3) + '" fill="' + INK +
+             '" font-size="8.5" font-family="var(--font-mono)" text-anchor="middle">' + esc(sw.at) + '</text>';
+    });
+
+    // NOW pointer — the live orange hand the surfaces share
+    var now = new Date();
+    var nowH = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+    var nowA = hourAngle(nowH);
+    var n1 = polar(nowA, R_HUB), n2 = polar(nowA, R_DAY - 2), nl = polar(nowA, R_DAY + 14);
+    svg += '<circle cx="' + CX + '" cy="' + CY + '" r="3" fill="' + ORANGE + '"/>';
+    svg += '<line x1="' + f(n1[0]) + '" y1="' + f(n1[1]) + '" x2="' + f(n2[0]) + '" y2="' + f(n2[1]) +
+           '" stroke="' + ORANGE + '" stroke-width="2" stroke-linecap="round"/>';
+    svg += '<circle cx="' + f(n2[0]) + '" cy="' + f(n2[1]) + '" r="2.8" fill="' + ORANGE + '"/>';
+    svg += '<text x="' + f(nl[0]) + '" y="' + f(nl[1] + 3) + '" fill="' + INK +
+           '" font-size="9" font-weight="700" font-family="var(--font-narrow)" letter-spacing="1" text-anchor="middle">NOW</text>';
+
+    document.getElementById('dial').innerHTML = svg;
+    var n = (D.live.sweeps || []).length;
+    document.getElementById('dialCap').textContent =
+      n ? (n + ' sweep' + (n > 1 ? 's' : '') + ' today · open rings are the scheduled cadence · filled dots are real passes')
+        : 'no --apply sweeps logged today yet · open rings mark the scheduled cadence';
+  })();
+
+  // ---- chronic (stuck + flapping) ----
+  (function () {
+    var c = D.chronic || {}, html = '';
+    var stuck = c.stuck || [];
+    html += '<table><thead><tr><th>Stuck proposal</th><th>Why</th><th style="text-align:right">Passes</th><th>Since</th></tr></thead><tbody>';
+    if (!stuck.length) html += '<tr><td colspan="4"><span class="empty">nothing stuck — every proposal is fresh</span></td></tr>';
+    stuck.forEach(function (r) {
+      html += '<tr><td class="mono"><span class="kind">' + esc(r.kind) + '</span>' + esc(r.item) + '</td><td>' + esc(r.why) +
+        '</td><td class="num">' + r.passes + '</td><td class="mono">' + esc(r.since) + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    var flap = c.flapping || [];
+    if (flap.length) {
+      html += '<div style="margin-top:18px" class="snote">Flapping — healed repeatedly inside 7 days (a restart masking a fault):</div>';
+      html += '<table><tbody>' + flap.map(function (r) {
+        return '<tr><td class="mono">' + esc(r.item) + '</td><td class="num">' + r.heals + ' heals / 7d</td></tr>';
+      }).join('') + '</tbody></table>';
+    }
+    document.getElementById('chronic').innerHTML = html;
+  })();
+
+  // ---- escalations MTTR ----
+  (function () {
+    var arr = (D.chronic || {}).escalations || [];
+    var html = '<table><thead><tr><th>Item</th><th>State</th><th>First seen</th><th>Last seen</th><th style="text-align:right">Standing (h)</th></tr></thead><tbody>';
+    if (!arr.length) html += '<tr><td colspan="5"><span class="empty">nothing has ever escalated — a clean lane</span></td></tr>';
+    arr.forEach(function (r) {
+      html += '<tr><td class="mono"><span class="kind">' + esc(r.kind) + '</span>' + esc(r.item) + '</td>' +
+        '<td>' + (r.ongoing ? '<span class="pill on">ongoing</span>' : '<span class="pill off">resolved</span>') + '</td>' +
+        '<td class="mono">' + esc(r.first) + '</td><td class="mono">' + esc(r.last) + '</td>' +
+        '<td class="num">' + (r.hours == null ? '—' : r.hours) + '</td></tr>';
+    });
+    document.getElementById('escalations').innerHTML = html + '</tbody></table>';
+  })();
+
+  // ---- trend ----
+  (function () {
+    var t = D.trend || [];
+    var maxP = Math.max(1, Math.max.apply(null, t.map(function (d) { return d.proposed; }).concat([1])));
+    document.getElementById('trend').innerHTML = t.map(function (d) {
+      var h = Math.round((d.proposed / maxP) * 100);
+      return '<div class="bar" title="' + esc(d.date) + ': ' + d.proposed + ' proposed, ' + d.healed + ' healed, ' + d.escalated + ' escalated">' +
+        (d.escalated ? '<div class="esc"></div>' : '') +
+        (d.healed ? '<div class="cap"></div>' : '') +
+        '<div class="stk" style="height:' + h + '%"></div></div>';
+    }).join('');
+    if (t.length) {
+      document.getElementById('trendX').innerHTML =
+        '<span>' + esc(t[0].date.slice(5)) + '</span><span>' + esc(t[t.length - 1].date.slice(5)) + '</span>';
+    }
+  })();
+
+  // ---- colophon ----
+  var lg = D.ledger || {};
+  document.getElementById('colophon').innerHTML =
+    '<div class="row"><b>The Gardener</b> tends 08:50 / 14:00 / 20:00 via <code>com.id8labs.gardener</code>. ' +
+    'AUTO heals internal + reversible; PROPOSE needs a hand; ESCALATE is client/irreversible and never auto-touched.</div>' +
+    '<div class="row">Data refreshed deterministically by <code>gardener-cockpit-scan.py</code> from ' +
+    '<code>gardener-report.json</code> + <code>gardener-ledger.jsonl</code> (' + esc(lg.passes) + ' passes, ' +
+    esc(lg.first) + ' → ' + esc(lg.last) + ').</div>' +
+    '<div class="row">Scan generated <code>' + esc(D.generated) + '</code>. Freshness is measured by age against the tend cadence, never by calendar day.</div>';
+})();
+</script>
+</body>
+</html>

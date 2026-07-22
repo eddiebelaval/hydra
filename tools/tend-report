@@ -1,0 +1,7 @@
+#!/bin/bash
+# tend-report -- CLI face of the tend contract, for jobs that can't source the
+# lib (a launchd wrapper, a python job shelling out, a one-liner). Same args as
+# tend_report in tend-lib.sh:
+#   tend-report <system> <GREEN|YELLOW|RED> <detail> [cadence_hours] [esc_why] [esc_route] [healed]
+source "$HOME/.hydra/tools/tend-lib.sh"
+tend_report "$@"

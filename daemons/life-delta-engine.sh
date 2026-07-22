@@ -10,6 +10,12 @@
 
 set -euo pipefail
 
+# Tend contract (TEND-CONTRACT.md): self-report on every exit path so the
+# Gardener aggregates life-delta by its own word, not by a launchd exit code.
+# Weekly cadence (Sunday 7pm) -> 168h.
+source "$HOME/.hydra/tools/tend-lib.sh" 2>/dev/null || true
+trap 'rc=$?; if [ "$rc" -eq 0 ]; then tend_report life-delta GREEN "life delta run complete" 168; else tend_report life-delta RED "exited $rc" 168 "life-delta engine failed (exit $rc)" "read the log; owns its lane"; fi' EXIT
+
 HYDRA_ROOT="$HOME/.hydra"
 HYDRA_DB="$HYDRA_ROOT/hydra.db"
 NOTIFY="$HYDRA_ROOT/daemons/notify-eddie.sh"

@@ -44,6 +44,35 @@ STALE_DAYS = 3
 FLAP_HEALS = 3     # same fleet item kickstart-healed this many times in FLAP_DAYS = a masked fault
 FLAP_DAYS = 7
 
+# --- Phase 1 sensors (folded from the reporter into the tender) --------------
+# Disk pressure is INTERNAL: it never escalates. AUTO reclaim is REGENERABLE
+# ONLY (TM local snapshots, pnpm store, npm cache) and fires only below target;
+# the heavy mass (Library/Development) is PROPOSE, never auto-deleted.
+DATA_VOLUME = "/System/Volumes/Data"   # the real user-data volume (not the sealed system snapshot)
+# Measured the SAME way the canonical check does (hydra-heartbeat.sh: df -k avail
+# / 1048576 GB) so the gardener and the heartbeat never disagree on ground truth.
+# 20G is heartbeat's warning line -- the gardener starts reclaiming right there.
+# (df's "available" on APFS counts purgeable space, so it swings as macOS makes
+# and drops local snapshots; that swing is exactly what regenerable reclaim is for.)
+LOW_DISK_GB = 20                       # below this, disk is a finding worth tending
+# A secret in a last-24h diff is ESCALATE (never auto-touch a secret), P0.
+SECRET_REPOS = [os.path.join(HOME, "Development", "id8"),
+                os.path.join(HOME, "clawd", "projects", "dae-v2")]
+SECRET_PATTERN = re.compile(
+    r"sk-ant-|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|"
+    r"eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+|"
+    r"ghp_[A-Za-z0-9]{30,}|xoxb-[0-9A-Za-z-]+|https://hooks\.slack\.com/services/")
+# Dependency-guardian report: critical/high need a human to bump -> PROPOSE.
+DEPGUARD_DIR = os.path.join(HOME, "Library", "Logs", "claude-automation", "dependency-guardian")
+# Memory brain health (the sentinel self-heals its own lane; the gardener surfaces).
+OBSERVATORY_HEALTH = os.path.join(HOME, "Development", "id8", "observatory", "data", "health.json")
+# The cockpit's deterministic refresher; the tender kicks it after each pass.
+COCKPIT_SCAN = os.path.join(HYDRA, "tools", "gardener-cockpit-scan.py")
+# Phase 3: the tend contract. Born-tendable systems self-report here; the
+# Gardener AGGREGATES their reports instead of inferring health from exit codes.
+TEND_DIR = os.path.join(HYDRA, "tend")
+TEND_STALE_GRACE = 1.5     # a system silent past cadenceHours * this = it stopped reporting
+
 # A label/atlas is CLIENT (escalate-only) if its slug carries one of these.
 CLIENT_HINTS = ("dnb", "donato", "brill", "datatech", "rose", "profesa", "lola", "nixon")
 
@@ -92,6 +121,102 @@ def sh(args, timeout=15):
         return subprocess.run(args, capture_output=True, text=True, timeout=timeout).stdout
     except Exception:
         return ""
+
+
+def which(cmd):
+    return bool(sh(["/usr/bin/which", cmd]).strip())
+
+
+# ----------------------------------------------------------------- disk sensor
+def free_gb(volume=DATA_VOLUME):
+    """Available space on the data volume, in GB. None if it can't be read."""
+    out = sh(["df", "-k", volume])
+    lines = out.splitlines()
+    if len(lines) < 2:
+        return None
+    parts = lines[1].split()
+    try:                                   # df -k cols: fs blocks used AVAIL cap ...
+        return int(parts[3]) / (1024 * 1024)
+    except (IndexError, ValueError):
+        return None
+
+
+def reclaim_regenerables(need_gb):
+    """AUTO disk heal: reclaim ONLY regenerable/reversible space -- never a file a
+    human can't trivially get back. Returns [(name, note)] of what actually ran."""
+    done = []
+    # 1) purgeable Time Machine local snapshots (macOS-managed, regenerates).
+    need_bytes = max(int(need_gb * 1024 ** 3), 1024 ** 3)
+    r = sh(["tmutil", "thinlocalsnapshots", "/", str(need_bytes), "1"], timeout=90)
+    if r.strip():
+        done.append(("tm-local-snapshots", r.strip().splitlines()[-1][:80]))
+    # 2) pnpm store: drop unreferenced packages (safe -- referenced ones stay).
+    if which("pnpm"):
+        sh(["pnpm", "store", "prune"], timeout=120)
+        done.append(("pnpm-store-prune", "unreferenced packages pruned"))
+    # 3) npm cache: regenerates on next install.
+    if which("npm"):
+        sh(["npm", "cache", "clean", "--force"], timeout=120)
+        done.append(("npm-cache-clean", "cache cleared (regenerates)"))
+    return done
+
+
+# --------------------------------------------------------------- secret sensor
+def secret_hits():
+    """High-signal grep over the last 24h of git diffs. A hit is a P0 escalate."""
+    per_repo = {}
+    for repo in SECRET_REPOS:
+        if not os.path.isdir(os.path.join(repo, ".git")):
+            continue
+        diff = sh(["git", "-C", repo, "log", "--since=24 hours ago", "-p", "--no-color"], timeout=60)
+        if not diff:
+            continue
+        c = sum(1 for line in diff.splitlines() if SECRET_PATTERN.search(line))
+        if c:
+            per_repo[os.path.basename(repo)] = c
+    return per_repo
+
+
+# ----------------------------------------------------------- dependency sensor
+def dep_counts():
+    """Latest dependency-guardian report: critical/high counts (PROPOSE fodder)."""
+    if not os.path.isdir(DEPGUARD_DIR):
+        return None
+    reports = sorted(glob.glob(os.path.join(DEPGUARD_DIR, "report-*.md")))
+    if not reports:
+        return None
+    try:
+        txt = open(reports[-1], errors="replace").read()
+    except OSError:
+        return None
+    def grab(sev):
+        m = re.search(rf"^\|\s*{sev}\s*\|[^0-9]*([0-9]+)", txt, re.M)
+        return int(m.group(1)) if m else 0
+    return {"critical": grab("Critical"), "high": grab("High"),
+            "report": os.path.basename(reports[-1])}
+
+
+# --------------------------------------------------------- memory-brain sensor
+def sentinel_health():
+    """The observatory's health.json: the brain sentinel's own verdict."""
+    try:
+        with open(OBSERVATORY_HEALTH) as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+# ----------------------------------------------------- tend-contract aggregator
+def tend_reports():
+    """Read every born-tendable system's self-report (~/.hydra/tend/*.json)."""
+    out = []
+    for path in sorted(glob.glob(os.path.join(TEND_DIR, "*.json"))):
+        try:
+            with open(path) as f:
+                out.append(json.load(f))
+        except Exception:
+            continue
+    return out
 
 
 # ---------------------------------------------------------------- fleet sensor
@@ -253,10 +378,19 @@ def tend():
     healed, proposed, escalated = [], [], []
     flap = recent_heal_counts()
 
+    # born-tendable systems speak for themselves (section 7). Read their reports
+    # up front so the fleet sensor can DEFER to a self-report instead of inferring
+    # health from a launchd exit code -- one authoritative signal per system.
+    reports = tend_reports()
+    tended = {str(r.get("system", "")).strip() for r in reports if r.get("system")}
+
     # 1) the fleet
     for f in fleet_failures():
         label, code = f["label"], f["code"]
         sensor = is_sensor(label)
+        short = label.replace("com.hydra.", "").replace("com.id8labs.", "")
+        if short in tended:
+            continue        # tendable: its self-report is the truth, not its exit code
         if is_client(label):
             why = (f"exit {code} — status reading, not a broken job" if sensor
                    else f"exit {code}; client/job-dependent job")
@@ -314,6 +448,97 @@ def tend():
                          "fix": "regenerate from real state (re-survey), then stamp asOf",
                          "log": a["path"]})
 
+    # 3) disk pressure (internal; regenerable-only AUTO, heavy mass PROPOSE)
+    fg = free_gb()
+    if fg is not None and fg < LOW_DISK_GB:
+        if APPLY:
+            done = reclaim_regenerables(LOW_DISK_GB - fg)
+            after = free_gb() or fg
+            if after - fg > 0.05:
+                healed.append({"kind": "disk", "item": "data-volume", "action": "reclaim regenerables",
+                               "now": f"{fg:.1f}G -> {after:.1f}G free (+{after - fg:.1f}G): "
+                                      + ", ".join(n for n, _ in done)})
+            if after < LOW_DISK_GB:
+                proposed.append({"kind": "disk", "item": "data-volume",
+                                 "why": f"{after:.1f}G free (< {LOW_DISK_GB}G target) after auto-reclaim",
+                                 "cause": "regenerable caches alone can't clear it; the mass is in Library/Development",
+                                 "fix": "run the disk audit: review ~/.npm ~/.cache ~/.pnpm-store, large node_modules, "
+                                        "Xcode DerivedData, and stale Development repos", "log": None})
+        else:
+            proposed.append({"kind": "disk", "item": "data-volume",
+                             "why": f"{fg:.1f}G free (< {LOW_DISK_GB}G target)",
+                             "cause": "disk low; regenerable reclaim available but not applied (dry run)",
+                             "fix": "the scheduled --apply pass reclaims TM snapshots + pnpm store + npm cache",
+                             "log": None})
+
+    # 4) secret scan (P0 escalate; never auto-touch a secret)
+    for repo, c in secret_hits().items():
+        escalated.append({"kind": "secret", "item": f"{repo} (last-24h diff)",
+                          "why": f"p0 — {c} secret-shaped line(s) in commits from the last 24h",
+                          "route": "rotate + scrub the history before any push (never auto-touched)"})
+
+    # 5) dependency-guardian (needs a human to bump -> PROPOSE)
+    dc = dep_counts()
+    if dc and (dc["critical"] > 0 or dc["high"] > 0):
+        proposed.append({"kind": "deps", "item": "dependency-guardian",
+                         "why": f"critical {dc['critical']}, high {dc['high']} ({dc['report']})",
+                         "cause": "vulnerable dependencies need a human to bump/patch",
+                         "fix": "review the dependency-guardian report and update the flagged packages",
+                         "log": None})
+
+    # 6) memory-brain health (sentinel self-heals its lane; the gardener surfaces)
+    shealth = sentinel_health()
+    if shealth:
+        st = str(shealth.get("status", "")).upper()
+        if st == "RED":
+            escalated.append({"kind": "sentinel", "item": "memory-brain",
+                              "why": f"observatory health RED (as of {shealth.get('date', '?')})",
+                              "route": "the brain is compromised — inspect observatory/data/health.json"})
+        elif st == "YELLOW":
+            bad = [c.get("id") for c in shealth.get("checks", []) if not c.get("ok")]
+            proposed.append({"kind": "sentinel", "item": "memory-brain",
+                             "why": f"observatory health YELLOW ({', '.join(b for b in bad if b) or 'see health.json'})",
+                             "cause": "the brain sentinel flagged a non-nominal check",
+                             "fix": "the sentinel self-heals its lane; review remaining flags in health.json",
+                             "log": None})
+
+    # 7) tend-contract aggregation: systems that self-report (born-tendable DNA).
+    #    The tender AGGREGATES; it never re-runs their work. A system's own RED /
+    #    escalate is routed unchanged; its self-heals are credited; a system that
+    #    stopped reporting (past its declared cadence) is surfaced.
+    for r in reports:
+        system = str(r.get("system") or "?")
+        status = str(r.get("status", "")).upper()
+        detail = str(r.get("detail", ""))
+        for h in (r.get("selfHealed") or []):
+            healed.append({"kind": "tend", "item": system, "action": "self-healed", "now": str(h)})
+        routed = False
+        for e in (r.get("escalate") or []):
+            escalated.append({"kind": "tend", "item": system,
+                              "why": str(e.get("why", detail)),
+                              "route": str(e.get("route", "the system's own lane"))})
+            routed = True
+        if status == "RED" and not routed:
+            escalated.append({"kind": "tend", "item": system,
+                              "why": f"self-reported RED: {detail}",
+                              "route": "the system's own lane (it flagged itself)"})
+        elif status == "YELLOW":
+            proposed.append({"kind": "tend", "item": system,
+                             "why": f"self-reported YELLOW: {detail}",
+                             "cause": "the system flagged a non-nominal state",
+                             "fix": "review the system's log; it owns the fix", "log": None})
+        cad = r.get("cadenceHours")
+        if cad:
+            try:
+                dt = datetime.datetime.strptime(str(r.get("asOf", ""))[:19], "%Y-%m-%dT%H:%M:%S")
+                if (now - dt).total_seconds() > float(cad) * 3600 * TEND_STALE_GRACE:
+                    proposed.append({"kind": "tend", "item": system,
+                                     "why": f"no fresh self-report (asOf {r.get('asOf', 'missing')}, cadence {cad}h)",
+                                     "cause": "a tendable system stopped reporting -- it may not be running",
+                                     "fix": "check the job fired on schedule", "log": None})
+            except (ValueError, TypeError):
+                pass
+
     # today's sweeps: each real (--apply) pass leaves a mark on the day dial.
     report_path = os.path.join(OUT_DIR, "gardener-report.json")
     prior = []
@@ -365,6 +590,14 @@ def tend():
         md += ["## Escalated (client / job-dependent - not touched)"] + [f"- {e['item']} - {e['why']} -> {e['route']}" for e in escalated] + [""]
     with open(os.path.join(OUT_DIR, "gardener-report.md"), "w") as f:
         f.write("\n".join(md))
+
+    # refresh the cockpit's data (deterministic, no LLM). Best-effort: a broken
+    # viz refresh must never fail a tend or block a heal.
+    if os.path.isfile(COCKPIT_SCAN):
+        try:
+            subprocess.run([sys.executable, COCKPIT_SCAN], capture_output=True, timeout=30)
+        except Exception:
+            pass
 
     return report
 
