@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.id8labs.claude-md-rebuild</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/eddiebelaval/.hydra/tools/claude-md-rebuild-reminder.sh</string>
+    </array>
+
+    <!-- Semi-annual: Feb 15 and Aug 15, 09:07 local.
+         Off-minute on purpose. Reports only; never modifies CLAUDE.md. -->
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict>
+            <key>Month</key>
+            <integer>8</integer>
+            <key>Day</key>
+            <integer>15</integer>
+            <key>Hour</key>
+            <integer>9</integer>
+            <key>Minute</key>
+            <integer>7</integer>
+        </dict>
+        <dict>
+            <key>Month</key>
+            <integer>2</integer>
+            <key>Day</key>
+            <integer>15</integer>
+            <key>Hour</key>
+            <integer>9</integer>
+            <key>Minute</key>
+            <integer>7</integer>
+        </dict>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/eddiebelaval</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/eddiebelaval/.hydra/logs/claude-md-rebuild.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/eddiebelaval/.hydra/logs/claude-md-rebuild.err</string>
+</dict>
+</plist>
