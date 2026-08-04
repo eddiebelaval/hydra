@@ -132,6 +132,13 @@ def read_atlases(today):
 
 # ---------------- the fleet: launchd exit codes become a petal ----------------
 
+# Jobs whose exit code means GREEN/YELLOW/RED (0/1/2) rather than ok/failed.
+TRISTATE_JOBS = {
+    "com.id8labs.memory-sentinel",
+    "com.id8labs.wiki-sentinel",
+}
+
+
 def read_fleet():
     try:
         out = subprocess.run(["launchctl", "list"], capture_output=True, text=True, timeout=15).stdout
@@ -149,8 +156,17 @@ def read_fleet():
         # a RUNNING job (pid present) is not failing, whatever its last exit was
         if pid.strip() != "-":
             continue
-        if status.strip() not in ("0", "-"):
-            failing.append({"label": label, "code": status.strip()})
+        code = status.strip()
+        if code in ("0", "-"):
+            continue
+        # The sentinels speak a three-state exit language: 0 GREEN, 1 YELLOW,
+        # 2 RED. Read literally, a YELLOW sentinel -- the normal resting state of
+        # a system carrying honest debt -- would sit here as a permanently
+        # "failing" job and drown the real alerts. Only RED is a failure; the
+        # sentinel's own atlas leg carries the YELLOW detail.
+        if label in TRISTATE_JOBS and code == "1":
+            continue
+        failing.append({"label": label, "code": code})
     fleet = {"total": total, "failing": failing}
     petal = {
         "name": "FLEET", "sub": f"{total} launchd jobs · {len(failing)} failing",

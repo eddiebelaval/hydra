@@ -1,4 +1,16 @@
 #!/bin/bash
+# RETIRED 2026-08-04 -- superseded by observatory/wiki_sentinel.py
+# (com.id8labs.wiki-sentinel, daily 09:47).
+#
+# Why: this daemon only ever read the 23 KBs in manifest.json, missing
+# 1,856 of the wiki's 2,166 files (86%). It reported without healing, had
+# no canary, no alert, and no atlas leg. It also wrote health.md, which
+# would now clobber the sentinel's richer version every Sunday.
+# Its launchd plist is parked at:
+#   ~/Library/LaunchAgents/com.hydra.kb-lint.plist.superseded-by-wiki-sentinel
+exit 0
+
+# ---- original below, unreachable ----
 # kb-lint-daemon.sh - Knowledge Base Health Checker
 #
 # Runs weekly Sunday 6 AM via launchd.
