@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.id8labs.claude-brain-pull</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/eddiebelaval/.hydra/tools/claude-brain-pull.sh</string>
+    </array>
+
+    <!-- Every 20 minutes, plus once at login. This is what replaces iCloud's
+         "it just appears" behavior. A fetch is cheap; a stale brain is not.
+         Pull only: never commits, never pushes, never resets. -->
+    <key>StartInterval</key>
+    <integer>1200</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/eddiebelaval</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/eddiebelaval/.hydra/logs/claude-brain-pull.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/eddiebelaval/.hydra/logs/claude-brain-pull.err</string>
+</dict>
+</plist>

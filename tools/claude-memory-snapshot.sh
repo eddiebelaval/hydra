@@ -20,7 +20,12 @@ set -euo pipefail
 
 REPO="$HOME/.claude"
 SCOPE="projects"
+BRANCH="${SNAPSHOT_BRANCH:-main}"
 MAX_DELETIONS="${MAX_DELETIONS:-10}"
+# SNAPSHOT_PUSH=1 makes this a real cross-machine bridge. Off by default so the
+# script is safe to run anywhere; the launchd plist turns it on deliberately.
+# This is a PRIVATE backup repo, not a client deliverable -- the human ship gate
+# still applies to everything that reaches a client or the public.
 STAMP="$(date '+%Y-%m-%d %H:%M')"
 ALERT="$REPO/MEMORY-SNAPSHOT-HALTED.md"
 
@@ -34,10 +39,50 @@ cd "$REPO" || { echo "cannot cd $REPO"; exit 1; }
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "not a git repo: $REPO"; exit 1; }
 [ -d "$REPO/$SCOPE" ] || { echo "no $SCOPE dir"; exit 1; }
 
+# --- multi-machine: take the other machine's memory FIRST ---------------------
+# Two Macs writing one brain. Rebase before committing so our snapshot replays on
+# top of theirs instead of forking. autoStash because ~/.claude always has
+# unrelated dirty paths (skills/, plugins/) that would otherwise block the rebase.
+# On conflict: ABORT and report. A repo left mid-rebase while 4-10 sessions are
+# live is worse than a skipped snapshot.
+if git remote get-url origin >/dev/null 2>&1; then
+  if git fetch origin --quiet 2>/dev/null; then
+    if ! git -c rebase.autoStash=true pull --rebase --quiet origin "$BRANCH" 2>/dev/null; then
+      git rebase --abort 2>/dev/null || true
+      git stash pop --quiet 2>/dev/null || true
+      {
+        echo "# Memory snapshot HALTED (rebase conflict) - $STAMP"
+        echo
+        echo "Could not replay local memory on top of origin/$BRANCH. Nothing was"
+        echo "committed and the rebase was aborted, so the repo is NOT mid-rebase."
+        echo
+        echo "This means both machines changed the same memory file. Resolve by hand:"
+        echo
+        echo '```bash'
+        echo "cd $REPO && git pull --rebase origin $BRANCH   # resolve, then:"
+        echo "~/.hydra/tools/claude-memory-snapshot.sh"
+        echo '```'
+        echo
+        echo "MEMORY.md is the usual culprit: it is append-heavy and both machines"
+        echo "edit it. Keep BOTH sides when merging it; dropping one loses memory."
+      } > "$ALERT"
+      notify "Rebase conflict. Nothing committed. See MEMORY-SNAPSHOT-HALTED.md"
+      echo "$STAMP  HALTED: rebase conflict against origin/$BRANCH"
+      exit 3
+    fi
+  else
+    echo "$STAMP  note: fetch failed (offline?); snapshotting locally only"
+  fi
+fi
+
 git add -A "$SCOPE" 2>/dev/null || true
 
 if git diff --cached --quiet -- "$SCOPE"; then
   echo "$STAMP  no memory changes"
+  # Still push if the rebase pulled in commits we have not shared yet.
+  if [ "${SNAPSHOT_PUSH:-0}" = "1" ] && [ -n "$(git log --oneline "origin/$BRANCH..HEAD" 2>/dev/null)" ]; then
+    git push --quiet origin "$BRANCH" 2>/dev/null && echo "$STAMP  pushed pending commits"
+  fi
   exit 0
 fi
 
@@ -97,3 +142,13 @@ git commit -q -m "chore(memory): snapshot $STAMP" \
 
 [ -f "$ALERT" ] && rm -f "$ALERT"
 echo "$STAMP  committed: ${A}A ${M}M ${R}R ${DELETED}D"
+
+# Publish so the other machine can pull it. Non-fatal: a failed push just means
+# the next run carries both snapshots up.
+if [ "${SNAPSHOT_PUSH:-0}" = "1" ]; then
+  if git push --quiet origin "$BRANCH" 2>/dev/null; then
+    echo "$STAMP  pushed to origin/$BRANCH"
+  else
+    echo "$STAMP  push failed (offline or rejected); will retry next run"
+  fi
+fi

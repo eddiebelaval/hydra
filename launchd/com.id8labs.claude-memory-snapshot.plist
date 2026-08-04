@@ -30,6 +30,11 @@
         <string>/Users/eddiebelaval</string>
         <key>MAX_DELETIONS</key>
         <string>10</string>
+        <!-- Makes this a real cross-machine bridge: the snapshot is published so
+             the other Mac's pull job can see it. Private backup repo, not a client
+             deliverable; the human ship gate still governs anything client-facing. -->
+        <key>SNAPSHOT_PUSH</key>
+        <string>1</string>
     </dict>
 
     <key>RunAtLoad</key>
