@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.id8labs.journey-monthly</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/eddiebelaval/.hydra/tools/journey-monthly.sh</string>
+    </array>
+
+    <!-- 1st of the month, 08:37. Describes the month that just ended.
+         Writes a DRAFT and notifies; does not touch JOURNEY.md. The lab story is
+         Eddie's voice and the company's identity, so landing it is his call.
+         Set JOURNEY_AUTOLAND=1 here to change that deliberately. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Day</key>
+        <integer>1</integer>
+        <key>Hour</key>
+        <integer>8</integer>
+        <key>Minute</key>
+        <integer>37</integer>
+    </dict>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/eddiebelaval</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/eddiebelaval/.hydra/logs/journey-monthly.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/eddiebelaval/.hydra/logs/journey-monthly.err</string>
+</dict>
+</plist>
