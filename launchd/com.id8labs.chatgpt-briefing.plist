@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.id8labs.chatgpt-briefing</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/eddiebelaval/.hydra/tools/chatgpt-briefing-gen.sh</string>
+    </array>
+
+    <!-- Mondays 08:11. Regenerates ~/.claude/CHATGPT-BRIEFING.md from the live brain
+         so the paste is never stale. Writes one file; changes nothing else. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key>
+        <integer>1</integer>
+        <key>Hour</key>
+        <integer>8</integer>
+        <key>Minute</key>
+        <integer>11</integer>
+    </dict>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/eddiebelaval</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/eddiebelaval/.hydra/logs/chatgpt-briefing.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/eddiebelaval/.hydra/logs/chatgpt-briefing.err</string>
+</dict>
+</plist>
