@@ -273,6 +273,20 @@ def check_divergent_copies():
     import hashlib
     names = {}
     watch = ("AGENTS.md", "CLAUDE.md", "SKILL.md", "settings.json", "config.toml")
+
+    def loadable_skill(p):
+        """A SKILL.md is only READ when it sits exactly at <...>/skills/<name>/SKILL.md.
+        Anything deeper is inert -- e.g. ~/.claude/skills/gstack/ is a whole cloned
+        repo (github.com/garrytan/gstack) carrying 100+ nested SKILL.md files that
+        nothing loads. Comparing those against the live top-level skills produced 7
+        confident HIGH findings on 2026-08-06, all false: this session demonstrably
+        loaded ~/.claude/skills/retro/SKILL.md, not gstack/retro/SKILL.md.
+        A stale copy nothing can read is not a stale copy."""
+        parts = p.split(os.sep)
+        if "skills" not in parts:
+            return False
+        i = len(parts) - 1 - parts[::-1].index("skills")   # last 'skills' segment
+        return len(parts) - i == 3                         # skills/<name>/SKILL.md
     for r in ("~/.claude", "~/.codex", "~/.agents", "~/.hydra"):
         root = H(r)
         if not os.path.isdir(root): continue
@@ -285,6 +299,7 @@ def check_divergent_copies():
                 if n not in watch: continue
                 p = os.path.join(dp, n)
                 if os.path.islink(p) or skip(p): continue
+                if n == "SKILL.md" and not loadable_skill(p): continue
                 key = (n, os.path.basename(dp))
                 try:
                     h = hashlib.md5(open(p, "rb").read()).hexdigest()
