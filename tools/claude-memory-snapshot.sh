@@ -75,6 +75,20 @@ if git remote get-url origin >/dev/null 2>&1; then
   fi
 fi
 
+# --- index oversize guard ---------------------------------------------------
+# MEMORY.md is auto-injected every session and SILENTLY TRUNCATES past ~17.1KB --
+# the tail (newest entries) just stops being loaded, with no error anywhere. It
+# regressed from 16.6KB to 19.9KB in 48 hours on 2026-08-04..06 purely from
+# normal session growth. Detection has to be automatic; nobody notices this.
+IDX="$REPO/projects/-Users-eddiebelaval-Development-id8/memory/MEMORY.md"
+if [ -f "$IDX" ]; then
+  SZ=$(wc -c < "$IDX" | tr -d ' ')
+  if [ "$SZ" -gt 17100 ]; then
+    notify "MEMORY.md is ${SZ}B (>17100). The tail is being dropped on load."
+    echo "$STAMP  WARN: MEMORY.md ${SZ}B exceeds the ~17100B read limit -- tail silently dropped"
+  fi
+fi
+
 git add -A "$SCOPE" 2>/dev/null || true
 
 if git diff --cached --quiet -- "$SCOPE"; then
