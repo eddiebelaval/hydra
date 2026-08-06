@@ -108,7 +108,15 @@ def check_launchd():
             add("HIGH", "launchd-missing-program", label,
                 f"ProgramArguments points at {tilde(target)} which does not exist",
                 "fix the path or unload the agent")
-        if label not in loaded_labels:
+        # A plist carrying Disabled=True is deliberately off, not broken. On
+        # 2026-08-06 this check flagged sunbiz-checker, annual-report-reminder and
+        # quarterly-tax-reminder as unregistered; all three were superseded by the
+        # loaded llc-ops suite (llc-sentinel, llc-monitor, llc-guardian,
+        # llc-comptroller) back in February and switched off ON PURPOSE. Reporting
+        # a deliberate decision as rot invites someone to "fix" it by turning it
+        # back on. Intent beats state.
+        deliberately_off = bool(d.get("Disabled"))
+        if label not in loaded_labels and not deliberately_off:
             add("LOW", "launchd-not-loaded", label,
                 "plist on disk but not registered with launchctl",
                 "launchctl load it, or archive the plist")
@@ -116,9 +124,18 @@ def check_launchd():
         out = d.get("StandardOutPath")
         if out and target and os.path.exists(target):
             if not os.path.exists(out):
-                add("MED", "launchd-never-ran", label,
-                    "loaded and program exists, but its log has never been written",
-                    "run it by hand once and confirm it works")
+                # The old message asserted "loaded and program exists" without
+                # checking loaded, and could not tell "broken since April" from
+                # "installed this morning, first fires Sunday". Both produced the
+                # same confident MED. A job that is off on purpose, or simply not
+                # due yet, has not failed at anything.
+                plist_age_d = (NOW - datetime.fromtimestamp(os.path.getmtime(p))).days
+                not_due_yet = d.get("StartCalendarInterval") is not None and plist_age_d < 35
+                if label in loaded_labels and not deliberately_off and not not_due_yet:
+                    add("MED", "launchd-never-ran", label,
+                        f"loaded, program exists, plist is {plist_age_d}d old, but its "
+                        "log has never been written",
+                        "run it by hand once and confirm it works")
             else:
                 age = NOW - datetime.fromtimestamp(os.path.getmtime(out))
                 iv = d.get("StartInterval")
