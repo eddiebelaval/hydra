@@ -27,6 +27,16 @@ MEM="$HOME/.claude/projects/-Users-eddiebelaval-Development-id8/memory"
 # Default to LAST month (this runs on the 1st, describing the month that just ended).
 MONTH="${JOURNEY_MONTH:-$(date -v-1m '+%Y-%m')}"
 LABEL="$(date -j -f '%Y-%m' "$MONTH" '+%B %Y' 2>/dev/null || echo "$MONTH")"
+# Real last day of MONTH. Do NOT hardcode 31: git's approxidate SILENTLY rolls
+# "2026-09-31" forward to Oct 1 and "2026-02-31" to Mar 3, so a hardcoded 31
+# leaks the next month's first commits into this month's entry with no error
+# and exit 0. Verified 2026-08-06. Handles short months, leap day, year rollover.
+NEXT="$(date -j -v+1m -f '%Y-%m-%d' "$MONTH-01" '+%Y-%m')"
+LASTDAY="$(date -j -v-1d -f '%Y-%m-%d' "$NEXT-01" '+%Y-%m-%d')"
+if [ -z "$NEXT" ] || [ -z "$LASTDAY" ]; then
+  echo "FAILED: could not compute month bounds for '$MONTH' (expected YYYY-MM)"; exit 1
+fi
+UNTIL="$LASTDAY 23:59:59"
 DRAFT="$ID8/JOURNEY-DRAFT-$MONTH.md"
 EVID="$(mktemp)"
 
@@ -51,17 +61,17 @@ command -v claude >/dev/null || { echo "claude CLI not found"; exit 1; }
            "$HOME/Development/Homer" "$HOME/Development/fed" \
            "$HOME/Development/sands-of-the-restless" "$HOME/Development/3327"; do
     [ -d "$r/.git" ] || continue
-    n=$(cd "$r" && git log --all --since="$MONTH-01" --until="$MONTH-31" \
+    n=$(cd "$r" && git log --all --since="$MONTH-01" --until="$UNTIL" \
           --no-merges --invert-grep --grep="chore(eod)" --oneline 2>/dev/null | wc -l | tr -d ' ')
     [ "$n" = "0" ] && continue
     echo "### $(basename "$r") — $n commits"
-    (cd "$r" && git log --all --since="$MONTH-01" --until="$MONTH-31" --no-merges \
+    (cd "$r" && git log --all --since="$MONTH-01" --until="$UNTIL" --no-merges \
        --invert-grep --grep="chore(eod)" --format="- %s" 2>/dev/null | sort -u | head -28)
     echo
   done
   echo "## Memories filed in $MONTH (what was learned)"
   echo
-  find "$MEM" -maxdepth 1 -name "*.md" -newermt "$MONTH-01" ! -newermt "$MONTH-31" 2>/dev/null \
+  find "$MEM" -maxdepth 1 -name "*.md" -newermt "$MONTH-01" ! -newermt "$UNTIL" 2>/dev/null \
     | head -30 | while read -r f; do
         d=$(grep -m1 '^description:' "$f" 2>/dev/null | cut -c14-260)
         echo "- $(basename "$f" .md): $d"
