@@ -27,7 +27,7 @@ import type { EntityId } from './types.js'
 
 const HYDRA_ROOT = process.env.HYDRA_ROOT || `${process.env.HOME}/.hydra`
 const MILO_RESPOND_PATH = path.join(HYDRA_ROOT, 'tools/milo-respond')
-const HYDRA_CHAT_MODEL = process.env.HYDRA_CHAT_MODEL || 'claude-sonnet-4-20250514'
+const HYDRA_CHAT_MODEL = process.env.HYDRA_CHAT_MODEL || 'claude-sonnet-5'
 
 // -- Parse CLI args --
 

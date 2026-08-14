@@ -165,7 +165,7 @@ CREATE INDEX IF NOT EXISTS idx_standups_agent ON standups(agent_id);
 -- SEED DATA: Initial agent roster
 -- ============================================================================
 INSERT OR IGNORE INTO agents (id, name, role, session_key, model, heartbeat_minutes, skills_filter, cost_tier) VALUES
-    ('milo', 'MILO', 'coordinator', 'milo', 'anthropic/claude-sonnet-4-20250514', 15, '["all"]', 'premium'),
+    ('milo', 'MILO', 'coordinator', 'milo', 'anthropic/claude-sonnet-5', 15, '["all"]', 'premium'),
     ('forge', 'FORGE', 'dev', 'forge', 'synthetic/hf:deepseek-ai/DeepSeek-V3.2', 30, '["frontend","backend","code-quality","automation"]', 'cheap'),
     ('scout', 'SCOUT', 'research', 'scout', 'synthetic/hf:Qwen/Qwen3-235B-A22B-Instruct-2507', 60, '["marketing","seo","cro","content","strategy"]', 'cheap'),
     ('pulse', 'PULSE', 'ops', 'pulse', 'synthetic/hf:meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8', 30, '["architecture","devops","operations","compliance"]', 'cheap'),

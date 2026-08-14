@@ -123,7 +123,7 @@ async function main() {
     loopCount++
 
     const response = await client.messages.create({
-      model: process.env.MILO_CHAT_MODEL || 'claude-sonnet-4-20250514',
+      model: process.env.MILO_CHAT_MODEL || 'claude-sonnet-5',
       max_tokens: 2048,
       system: systemPrompt,
       messages: currentMessages,

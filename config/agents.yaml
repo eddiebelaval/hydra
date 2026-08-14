@@ -5,7 +5,7 @@ agents:
   milo:
     name: MILO
     role: coordinator
-    model: anthropic/claude-sonnet-4-20250514
+    model: anthropic/claude-sonnet-5
     heartbeat_minutes: 15
     cost_tier: premium
     active_hours:

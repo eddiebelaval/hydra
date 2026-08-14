@@ -21,7 +21,7 @@ export ANTHROPIC_API_KEY
 export HYDRA_DB="$HYDRA_ROOT/hydra.db"
 export MILO_TELEGRAM_BOT_TOKEN
 export MILO_TELEGRAM_CHAT_ID
-export MILO_CHAT_MODEL="${MILO_CHAT_MODEL:-claude-sonnet-4-20250514}"
+export MILO_CHAT_MODEL="${MILO_CHAT_MODEL:-claude-sonnet-5}"
 
 cd "$RESPONDER"
 node --import tsx/esm src/heartbeat.ts 2>>"$LOG_FILE"

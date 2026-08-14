@@ -138,7 +138,7 @@ export HYDRA_DB
 # pre-move path (frozen May 4 2026) that blinded them to the workshop, D&B,
 # and the federation pod. See hydra-caf-loader.ts COORDINATION_ROOT.
 export COORDINATION_ROOT="${COORDINATION_ROOT:-$HOME/.claude/projects/-Users-eddiebelaval-Development-id8/memory}"
-export MILO_CHAT_MODEL="${MILO_CHAT_MODEL:-claude-sonnet-4-20250514}"
+export MILO_CHAT_MODEL="${MILO_CHAT_MODEL:-claude-sonnet-5}"
 export MILO_EXTRACTION_MODEL="${MILO_EXTRACTION_MODEL:-claude-haiku-4-5-20251001}"
 export MILO_ROLLING_WINDOW="${MILO_ROLLING_WINDOW:-40}"
 export MILO_SUMMARY_COUNT="${MILO_SUMMARY_COUNT:-5}"
