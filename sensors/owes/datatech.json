@@ -1,0 +1,29 @@
+{
+  "_provenance": {
+    "job": "datatech",
+    "note": "Operator-maintained list of Data-Tech's OWED HUMAN DECISIONS only - gates the live DB cannot see. The two DB-visible gates (Nixon product imagery, Yadira ACCPAC export) are NOT listed here; they are emitted live/derived from the catalog itself so they can never go stale. Tick an item done:true (or delete it) the moment the decision lands.",
+    "seededFrom": "project_datatech_w32_state_2026_08_04 (open gates as of 2026-08-04)",
+    "dbReconfirmed": "2026-08-13 - catalog still 1980/1980 no-image and 0 on source=live, so the engagement has not moved past the input-gathering gate; the two decisions below have no closure signal and are carried forward.",
+    "maintainer": "eddie / jose"
+  },
+  "owes": [
+    {
+      "id": "owes:nixon-access-742sku",
+      "title": "Nixon: sign off on the partner access method (emailed sign-in link, no password) and make the 742-SKU product-groups call",
+      "owner": "Nixon",
+      "priority": "high",
+      "dueOn": null,
+      "confirmedOpenAsOf": "2026-08-04",
+      "done": false
+    },
+    {
+      "id": "owes:marcos-tie-rule",
+      "title": "Marcos: confirm the ranking tie rule (our corrected rule is an inference until he confirms)",
+      "owner": "Marcos",
+      "priority": "high",
+      "dueOn": null,
+      "confirmedOpenAsOf": "2026-08-04",
+      "done": false
+    }
+  ]
+}

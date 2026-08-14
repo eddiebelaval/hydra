@@ -1,0 +1,8 @@
+{
+  "_provenance": {
+    "job": "dnb-install",
+    "note": "RETIRED 2026-08-13: Eddie adopted the dnb-build tasks board (ref yhzusrkiuqjvougthgrr) as D&B's live todo store. The emitter now reads the board live (board read ON via ~/.hydra/config/dnb-board.env). This owes file is intentionally EMPTY so there is no double-counting; leave it empty unless the board goes offline and you need a temporary hand-maintained fallback. REGULATED client rules still stand: no comms sweep, board rows must stay PII-free (tasks only).",
+    "maintainer": "eddie"
+  },
+  "owes": []
+}

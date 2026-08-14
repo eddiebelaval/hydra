@@ -847,6 +847,17 @@ Example: note: shipped the brain updater feature"
             fi
             ;;
 
+        todo)
+            # Capture a todo from Telegram into the master (inbox sensor).
+            local todo_text=$(echo "$cmd_args" | python3 -c "import sys,json; args=json.load(sys.stdin); print(args[0] if args else '')" 2>/dev/null || echo "")
+            if [[ -n "$todo_text" ]]; then
+                response=$(python3 "$HYDRA_TOOLS/telegram-todo.py" "$todo_text" 2>&1)
+            else
+                response="Usage: todo <text>   (tag a job with a leading #dnb, mark urgent with a leading !)
+Example: todo #dnb ask Jon for the watcher log"
+            fi
+            ;;
+
         activity)
             local limit=$(echo "$cmd_args" | python3 -c "import sys,json; args=json.load(sys.stdin); print(args[0] if args else '10')" 2>/dev/null || echo "10")
             response=$("$HYDRA_TOOLS/hydra-cli.sh" activity "$limit" 2>&1 | head -30 | sed 's/\x1b\[[0-9;]*m//g')
@@ -1231,6 +1242,9 @@ print('yes' if 'photo' in m else 'no')
                             gym_checkpoint)
                                 "$HYDRA_TOOLS/telegram-handle-gym-proof.sh" "$text" "$entity_id" 2>/dev/null &
                                 ;;
+                            email_approval)
+                                "$HYDRA_TOOLS/telegram-handle-email-approve-reply.sh" "$text" "$entity_id" 2>/dev/null &
+                                ;;
                             *)
                                 log "Unknown thread type: $thread_type"
                                 ;;
@@ -1244,8 +1258,15 @@ print('yes' if 'photo' in m else 'no')
         fi
     fi
 
-    # Parse command (natural language via Ollama, falls back to rigid parsing)
-    local parsed=$("$HYDRA_TOOLS/telegram-parse-natural.sh" "$text" 2>/dev/null || echo '{"type":"unknown"}')
+    # Deterministic todo capture: a message starting with "todo"/"/todo" bypasses the
+    # NL parser and is captured straight into the master (inbox sensor).
+    local parsed
+    if [[ "$text" =~ ^[[:space:]]*/?[Tt][Oo][Dd][Oo][[:space:]:]+(.+)$ ]]; then
+        parsed=$(printf '%s' "${BASH_REMATCH[1]}" | python3 -c 'import json,sys; print(json.dumps({"type":"todo","args":[sys.stdin.read().strip()],"confidence":"high"}))')
+    else
+        # Parse command (natural language via Ollama, falls back to rigid parsing)
+        parsed=$("$HYDRA_TOOLS/telegram-parse-natural.sh" "$text" 2>/dev/null || echo '{"type":"unknown"}')
+    fi
     local cmd_type=$(echo "$parsed" | python3 -c "import sys,json; print(json.load(sys.stdin).get('type','unknown'))" 2>/dev/null || echo "unknown")
     local cmd_args=$(echo "$parsed" | python3 -c "import sys,json; import json as j; print(j.dumps(json.load(sys.stdin).get('args',[])))" 2>/dev/null || echo "[]")
 

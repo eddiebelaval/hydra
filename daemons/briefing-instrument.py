@@ -37,6 +37,40 @@ ATLAS_GLOBS = [
 ]
 STALE_DAYS = 3          # an atlas older than this is flagged, not trusted silently
 BEAD_CAP = 6
+MASTER_TODO = os.path.join(HYDRA, "briefings", "master-todo.json")
+
+
+def read_master_todos(today):
+    """The cross-job master todo (todo-master-refresh writes it at 8:30, before
+    this instrument runs at 8:40). Read-only. A missing or stale master is SAID
+    to be so, never faked (sensor-audit law). Returns rows shaped for the row
+    renderer plus the hot count (overdue or due today, written items only)."""
+    try:
+        with open(MASTER_TODO) as f:
+            m = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {"rows": [], "hot": 0, "stale": "master not built yet"}
+    rows, hot = [], 0
+    for it in m.get("items", []):
+        due = it.get("dueOn")
+        derived = it.get("source") == "derived"
+        if due and due < today:
+            note, is_hot = "OVERDUE", True
+        elif due and due == today:
+            note, is_hot = "today", True
+        elif due:
+            note, is_hot = due, False
+        else:
+            note, is_hot = ("watch" if derived else ""), False
+        if is_hot and not derived:
+            hot += 1
+        pod = f" ({it['pod']})" if it.get("pod") else ""
+        rows.append({"who": it.get("who", "?"), "text": f"{it.get('title', '')}{pod}", "note": note})
+    stale = "; ".join(f"{j} ({why})" for j, why in m.get("stale", [])) or None
+    gen = str(m.get("generatedAt", ""))[:10]
+    if gen and gen < today:
+        stale = (stale + "; " if stale else "") + f"master last built {gen}"
+    return {"rows": rows, "hot": hot, "stale": stale}
 
 
 def q(cur, sql, params=()):
@@ -350,6 +384,7 @@ def main():
         "signals": signals,
         "projectActivity": gather_activity(),
         "schedule": gather_schedule(),
+        "todos": read_master_todos(date_str),
     }
 
     # the one v1 loop kept alive on purpose: the 8 AM priorities reply
@@ -393,6 +428,15 @@ def write_markdown_twin(d):
     out = [f"# Morning Briefing (Instrument twin)", f"## {d['dayName']}, {d['date']} · {verdict}", ""]
     out += ["## Today's Priorities", ""]
     out += [f"{p['n']}. {p['text']}" for p in d["priorities"]] or ["Not set yet. Reply to the 8 AM prompt."]
+    tw = d.get("todos") or {}
+    if tw.get("rows"):
+        head = "## Your list, top of the stack"
+        if tw.get("hot"):
+            head += f" ({tw['hot']} with a clock today)"
+        out += ["", head, ""]
+        out += [f"- [{r['who']}] {r['text']}" + (f" - {r['note']}" if r['note'] else "") for r in tw["rows"][:12]]
+        if tw.get("stale"):
+            out += ["", f"_stale sensors: {tw['stale']}_"]
     if att:
         out += ["", f"## Attention ({len(att)})", ""]
         out += [f"- **{a['who']}**: {a['text']}" + (f" ({a['note']})" if a.get("note") else "") for a in att]
@@ -421,6 +465,13 @@ def write_summary(d):
         msg += ["Priorities:"] + [f"{p['n']}. {p['text']}" for p in d["priorities"]] + [""]
     else:
         msg += ["Priorities: not set (reply to the 8 AM prompt)", ""]
+    tw = d.get("todos") or {}
+    if tw.get("rows"):
+        msg += [f"Your list ({tw['hot']} hot):" if tw.get("hot") else "Your list:"]
+        msg += [f"- {r['text'][:80]}" + (f" [{r['note']}]" if r['note'] else "") for r in tw["rows"][:5]]
+        if len(tw["rows"]) > 5:
+            msg.append(f"...and {len(tw['rows']) - 5} more")
+        msg.append("")
     if att:
         msg += [f"Attention ({len(att)}):"] + [f"- {a['who']}: {a['text'][:80]}" for a in att[:6]]
         if len(att) > 6:
