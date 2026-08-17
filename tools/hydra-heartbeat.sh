@@ -313,6 +313,60 @@ PYEOF
 }
 
 # ============================================================================
+# CHECK 6: LEXICON INTAKE (Tg watcher) — catches the SILENT-BLIND failure
+# launchd already restarts a crashed pass; what it can't see is a watcher that
+# runs, exits 0, logs "0 new" — while blind (source dir moved) or quietly
+# stopped (never fires). We assert the watcher is loaded, its rollup is FRESH
+# (proves a pass actually ran, not just that launchd claims active), and its
+# atrium source is readable (proves the eye isn't blind-reporting zero).
+# ============================================================================
+
+check_intake() {
+    log "Check 6: Lexicon intake (Tg watcher)"
+
+    local label="com.id8labs.lexicon-intake-watch"
+    local rollup="$HOME/.hydra/sensors/intake/pending-intake.json"
+    local atrium_src="$HOME/Development/atrium/live/sessions"
+    local max_age_min=20   # watcher runs every 5m; 4 missed passes = stalled
+
+    # 6a. watcher loaded?
+    if launchctl print "gui/$(id -u)/$label" >/dev/null 2>&1; then
+        record_check "intake" "watcher_loaded" "healthy" "launchd service active"
+    else
+        record_check "intake" "watcher_loaded" "critical" "$label not loaded — re-bootstrap the plist"
+    fi
+
+    # 6b. rollup fresh? (proves a pass actually ran)
+    if [[ -f "$rollup" ]]; then
+        local age_min
+        age_min=$(python3 -c "
+import json, datetime
+try:
+    g = json.load(open('$rollup')).get('generatedAt')
+    t = datetime.datetime.strptime(g.replace('Z',''), '%Y-%m-%dT%H:%M:%S.%f')
+    now = datetime.datetime.utcnow()
+    print(int((now - t).total_seconds() // 60))
+except Exception:
+    print(99999)
+" 2>/dev/null || echo "99999")
+        if [[ "$age_min" -lt "$max_age_min" ]]; then
+            record_check "intake" "freshness" "healthy" "rollup ${age_min}m old (< ${max_age_min}m)"
+        else
+            record_check "intake" "freshness" "critical" "rollup ${age_min}m old — watcher stalled (limit ${max_age_min}m)"
+        fi
+    else
+        record_check "intake" "freshness" "critical" "pending-intake.json missing — watcher never wrote a rollup"
+    fi
+
+    # 6c. source readable? (proves the eye isn't blind-reporting zero)
+    if [[ -d "$atrium_src" ]] && [[ -r "$atrium_src" ]]; then
+        record_check "intake" "source_atrium" "healthy" "source dir readable"
+    else
+        record_check "intake" "source_atrium" "critical" "atrium source $atrium_src missing/unreadable — 0-new is BLIND, not empty"
+    fi
+}
+
+# ============================================================================
 # RUN ALL CHECKS
 # ============================================================================
 
@@ -321,6 +375,7 @@ check_database
 check_disk
 check_event_buffer
 check_api
+check_intake
 
 # Cleanup: prune health records older than 30 days
 sqlite3 "$HYDRA_DB" "DELETE FROM system_health WHERE check_time < datetime('now', '-30 days');" 2>/dev/null
