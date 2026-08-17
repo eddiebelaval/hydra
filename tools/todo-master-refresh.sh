@@ -47,3 +47,11 @@ fi
 python3 "$HOME/.hydra/tools/master-todo.py" --json "$HOME/.hydra/briefings/master-todo.json" >> "$LOG" 2>&1
 python3 "$HOME/.hydra/tools/master-todo.py" > "$HOME/.hydra/briefings/master-todo.md" 2>> "$LOG"
 echo "master refreshed: $(wc -l < "$HOME/.hydra/briefings/master-todo.md") lines" >> "$LOG"
+
+# --- native surface: project WRITTEN master items into Apple Reminders ---
+# One-way, dedupe-by-name (ticks stick, no churn); derived deadline reminders
+# excluded. NOTE: controlling Reminders needs macOS Automation permission — verified
+# interactively; if the 8:30 launchd run logs "failed", grant Automation access to
+# this job's process (System Settings > Privacy & Security > Automation) or run the
+# projection from a user-session agent.
+bash "$HOME/.hydra/tools/reminders-project.sh" >> "$LOG" 2>&1
