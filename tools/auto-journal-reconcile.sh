@@ -24,6 +24,18 @@ LOG_FILE="$LOG_DIR/$DATE.log"
 PROMPT_FILE="$QUEUE_DIR/.reconcile-prompt.md"
 PLAN_FILE="$QUEUE_DIR/.reconcile-plan.json"
 
+# Tend contract (TEND-CONTRACT.md): self-report on every exit so the Gardener
+# reads auto-journal-reconcile by its own word, not by a launchd exit code.
+source "$HOME/.hydra/tools/tend-lib.sh" 2>/dev/null || true
+trap 'rc=$?; if [ "$rc" -eq 0 ]; then tend_report auto-journal-reconcile GREEN "journal reconciled" 24; else tend_report auto-journal-reconcile RED "exited $rc" 24 "auto-journal-reconcile failed (exit $rc)" "read the reconciler log; owns its lane"; fi' EXIT
+
+# Bill this job to metered API usage instead of Eddie's interactive Claude
+# subscription (2026-07-31). Sourced AFTER the tend trap on purpose: the loader
+# hard-exits 78 when the Keychain key is missing, and we want that to arrive as
+# a RED tend report rather than a silent death. Disables claude.ai connectors —
+# fine here, the reconciler reads a local queue file and writes local journals.
+source "$HOME/.claude/id8labs-sub.env"  # 2026-08-17: id8labs SUBSCRIPTION (was metered API via automation.env)
+
 log() { echo "$(date '+%H:%M:%S') $*" >> "$LOG_FILE"; }
 
 if [[ ! -s "$QUEUE_FILE" ]]; then
@@ -76,6 +88,13 @@ Rules:
     named feedback rules             -> a new feedback memory file under
                                         ~/.claude/projects/-Users-eddiebelaval-Development-id8/memory/
 - Each entry: ONE line, dated, past tense, with WHAT and WHY.
+- LEGIBLE TO EDDIE (the reader is a busy human, not the machine): lead with what
+  the event MEANS for him -- the consequence (cost, risk, what now runs, what is
+  blocked, what shipped) -- BEFORE the internal mechanism. "Eddie's API access is
+  capped until Sept 1 (affects cost + what runs)" beats "metered API cap blown;
+  moved 2 CLI jobs to the sub." An entry that is accurate but that he cannot parse
+  at a glance is a FAILURE. Put the machine detail after the meaning, not instead
+  of it.
   Example:
     - "2026-04-30 — Sidelined v1 deepstack platform. v2 (clawd/dae-v2)
       is the live Kalshi bot. False alarm RED in /dae-health was reading
