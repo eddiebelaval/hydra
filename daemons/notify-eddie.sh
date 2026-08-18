@@ -122,14 +122,31 @@ $(date '+%Y-%m-%d %H:%M')"
     # Escape for JSON (macOS compatible)
     local json_text=$(printf '%s' "$plain_msg" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
 
-    # Send via Telegram Bot API
+    # Convert any Markdown in the alert to Telegram HTML so **bold**/`code`
+    # render instead of literal markers. Send as HTML; if Telegram rejects the
+    # formatting, fall back to the plain JSON-escaped text so the alert lands.
+    local json_html
+    json_html=$(printf '%s' "$plain_msg" | python3 "$HOME/.hydra/tools/md-to-tg-html.py" 2>/dev/null)
+    [[ -z "$json_html" ]] && json_html="$json_text"
+
     local response=$(telegram_curl "sendMessage" -X POST \
         -H "Content-Type: application/json" \
         -d "{
             \"chat_id\": \"${TELEGRAM_CHAT_ID}\",
-            \"text\": ${json_text},
+            \"text\": ${json_html},
+            \"parse_mode\": \"HTML\",
             \"disable_notification\": false
         }" 2>/dev/null)
+
+    if ! echo "$response" | grep -q '"ok":true'; then
+        response=$(telegram_curl "sendMessage" -X POST \
+            -H "Content-Type: application/json" \
+            -d "{
+                \"chat_id\": \"${TELEGRAM_CHAT_ID}\",
+                \"text\": ${json_text},
+                \"disable_notification\": false
+            }" 2>/dev/null)
+    fi
 
     if echo "$response" | grep -q '"ok":true'; then
         # Extract message_id for reply context tracking
