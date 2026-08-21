@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.id8labs.id8labs-profile-check</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/eddiebelaval/.hydra/tools/id8labs-profile-check.sh</string>
+    </array>
+
+    <!-- Every 2 hours. Probes the id8labs billing profile and writes the status
+         flag sub.env reads; alerts once on expiry. Keeps the whole fleet from
+         silently failing when the login goes stale. -->
+    <key>StartInterval</key>
+    <integer>7200</integer>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/eddiebelaval/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/eddiebelaval</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/eddiebelaval/.hydra/logs/id8labs-profile-check.out</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/eddiebelaval/.hydra/logs/id8labs-profile-check.err</string>
+</dict>
+</plist>
