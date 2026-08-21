@@ -25,8 +25,16 @@ LOG_DIR="$HYDRA/logs"
 DREAM_FILE="$DREAMS_DIR/DREAM.md"
 VOZ_GENOME="$HOME_DIR/.claude/skills/voz/VOICE-GENOME.md"
 FIELD_NOTES="$HOME_DIR/Development/id8/FIELD_NOTES.md"
-DATE="$(date '+%Y-%m-%d')"
-NICE_DATE="$(date '+%A, %B %-d')"
+# Target date: today by default, or a past YYYY-MM-DD passed as $1 (backfill).
+TARGET_DATE="${1:-$(date '+%Y-%m-%d')}"
+TODAY="$(date '+%Y-%m-%d')"
+DATE="$TARGET_DATE"
+NICE_DATE="$(date -j -f '%Y-%m-%d' "$TARGET_DATE" '+%A, %B %-d' 2>/dev/null || echo "$TARGET_DATE")"
+NEXT_DATE="$(date -j -v+1d -f '%Y-%m-%d' "$TARGET_DATE" '+%Y-%m-%d' 2>/dev/null || echo "$TARGET_DATE")"
+FN_BD="$(date -j -f '%Y-%m-%d' "$TARGET_DATE" '+%b %-d' 2>/dev/null || echo "$TARGET_DATE")"
+FN_MD="$(date -j -f '%Y-%m-%d' "$TARGET_DATE" '+%m/%d' 2>/dev/null || echo "$TARGET_DATE")"
+# Backfill mode: a past date writes ONLY to the store, never clobbers today's DREAM.md.
+if [ "$TARGET_DATE" != "$TODAY" ]; then BACKFILL=1; OUT="$STORE_DIR/dream-$TARGET_DATE.md"; else BACKFILL=0; OUT="$DREAM_FILE"; fi
 LOG_FILE="$LOG_DIR/dream-sweep.log"
 
 mkdir -p "$DREAMS_DIR" "$STORE_DIR" "$LOG_DIR"
@@ -49,12 +57,12 @@ ACTUAL_FILE="$(mktemp)"
               "$HOME_DIR/Development/id8/lexicon" "$HOME_DIR/Development/id8/id8labs"; do
     [ -d "$repo/.git" ] || [ -f "$repo/.git" ] || continue
     name="$(basename "$repo")"
-    commits="$(git -C "$repo" log --since='00:00' --pretty='  %s' --no-merges 2>/dev/null | grep -viE 'chore\(eod\)|nightly snapshot' | head -25 || true)"
+    commits="$(git -C "$repo" log --since="$DATE 00:00" --until="$DATE 23:59:59" --pretty='  %s' --no-merges 2>/dev/null | grep -viE 'chore\(eod\)|nightly snapshot' | head -25 || true)"
     [ -n "$commits" ] && { echo "### $name"; echo "$commits"; }
   done
   echo
   echo "## FIELD_NOTES lines dated today"
-  grep -E "$DATE|$(date '+%b %-d')|$(date '+%m/%d')" "$FIELD_NOTES" 2>/dev/null | head -15 || echo "  (none dated today)"
+  grep -E "$DATE|$FN_BD|$FN_MD" "$FIELD_NOTES" 2>/dev/null | head -15 || echo "  (none dated today)"
 } > "$ACTUAL_FILE" 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
@@ -66,7 +74,7 @@ FELT_FILE="$(mktemp)"
 PROJECTS="$HOME_DIR/.claude/projects"
 {
   # Session files modified today, top-level only (skip subagents/ and this sweep's noise).
-  find "$PROJECTS" -maxdepth 2 -name '*.jsonl' -not -path '*/subagents/*' -newermt "$DATE 00:00" 2>/dev/null \
+  find "$PROJECTS" -maxdepth 2 -name '*.jsonl' -not -path '*/subagents/*' -newermt "$DATE 00:00" ! -newermt "$NEXT_DATE 00:00" 2>/dev/null \
     | while read -r f; do
         # Extract user message text; drop hook/system/command/tool noise.
         python3 - "$f" 2>/dev/null <<'PYEOF' || true
@@ -123,8 +131,8 @@ if [ "${FELT_BYTES:-0}" -lt 60 ] && [ "${ACTUAL_BYTES:-0}" -lt 60 ]; then
     echo "# The Dream — $NICE_DATE"
     echo
     echo "*Quiet night. The day left little trace on either sensor; nothing to metabolize.*"
-  } > "$DREAM_FILE"
-  cp "$DREAM_FILE" "$STORE_DIR/dream-$DATE.md" 2>/dev/null || true
+  } > "$OUT"
+  [ "$OUT" != "$STORE_DIR/dream-$DATE.md" ] && cp "$OUT" "$STORE_DIR/dream-$DATE.md" 2>/dev/null || true
   exit 0
 fi
 
@@ -202,8 +210,8 @@ else
     echo
     echo "*The dream did not form tonight (the model was unreachable). The day's signal"
     echo "is held in the log; try again tomorrow.*"
-  } > "$DREAM_FILE"
-  cp "$DREAM_FILE" "$STORE_DIR/dream-$DATE.md" 2>/dev/null || true
+  } > "$OUT"
+  [ "$OUT" != "$STORE_DIR/dream-$DATE.md" ] && cp "$OUT" "$STORE_DIR/dream-$DATE.md" 2>/dev/null || true
   exit 1
 fi
 
@@ -226,9 +234,9 @@ if [ "${DIVERGENCE:-0}" -ge 6 ]; then LOUD="LOUD"; BANNER="> **Read this one.** 
   echo
   echo "---"
   echo "*Felt vs actual: divergence $DIVERGENCE/10 ($DIRECTION). The one layer that never leaves the house.*"
-} > "$DREAM_FILE"
+} > "$OUT"
 
-cp "$DREAM_FILE" "$STORE_DIR/dream-$DATE.md" 2>/dev/null || true
+[ "$OUT" != "$STORE_DIR/dream-$DATE.md" ] && cp "$OUT" "$STORE_DIR/dream-$DATE.md" 2>/dev/null || true
 log "dream written: divergence=$DIVERGENCE direction=$DIRECTION loud=$LOUD"
 
 # Cleanup temps

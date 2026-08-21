@@ -37,5 +37,8 @@ osascript -e "display notification \"$SUBTITLE\" with title \"$TITLE\" sound nam
 # Open the dream so it's in front of him. Local only.
 open "$DREAM_FILE" >/dev/null 2>&1 || true
 
+# Send to Eddie's private Telegram, rendered (he asked for this 2026-08-21).
+bash "$HYDRA/tools/dream-send-telegram.sh" "$DREAM_FILE" 2>/dev/null || true
+
 log "surfaced (loud=${LOUD:-quiet} divergence=${DIVERGENCE:-?})"
 exit 0
