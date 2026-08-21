@@ -14,7 +14,7 @@
 # No resonance recall yet. Cheap model. The output is Eddie's rawest signal, so it
 # stays LOCAL -- gitignored, never pushed, never emailed, never sent outbound.
 #
-# Design doc: ~/Development/id8/dream-layer/SKETCH.md
+# Design doc: ~/.hydra/docs/dream-layer.md (design record); origin sketch at ~/Development/id8/dream-layer/SKETCH.md
 set -euo pipefail
 
 HOME_DIR="$HOME"
