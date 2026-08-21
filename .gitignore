@@ -34,3 +34,6 @@ __pycache__/
 
 # Runtime-emitted todo sensors (owes/ config stays tracked)
 sensors/todos/
+
+# The Dream Layer output — Eddie's rawest signal, never leaves the house
+dreams/

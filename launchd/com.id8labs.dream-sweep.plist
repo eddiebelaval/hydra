@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.id8labs.dream-sweep</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/eddiebelaval/.hydra/tools/dream-sweep.sh</string>
+    </array>
+
+    <!-- 03:30 nightly. The dreaming mind goes offline while Eddie sleeps: reads the
+         day's felt-vs-actual amplitude and writes ~/.hydra/dreams/DREAM.md. Local
+         only; never pushes, emails, or sends. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>3</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/eddiebelaval/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>/Users/eddiebelaval</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/eddiebelaval/.hydra/logs/dream-sweep.out</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/eddiebelaval/.hydra/logs/dream-sweep.err</string>
+</dict>
+</plist>
