@@ -9,6 +9,7 @@
     <array>
         <string>/bin/bash</string>
         <string>/Users/eddiebelaval/.hydra/tools/dream-sweep.sh</string>
+        <string>nightly</string>
     </array>
 
     <!-- 03:30 nightly. The dreaming mind goes offline while Eddie sleeps: reads the

@@ -25,16 +25,26 @@ LOG_DIR="$HYDRA/logs"
 DREAM_FILE="$DREAMS_DIR/DREAM.md"
 VOZ_GENOME="$HOME_DIR/.claude/skills/voz/VOICE-GENOME.md"
 FIELD_NOTES="$HOME_DIR/Development/id8/FIELD_NOTES.md"
-# Target date: today by default, or a past YYYY-MM-DD passed as $1 (backfill).
-TARGET_DATE="${1:-$(date '+%Y-%m-%d')}"
+# Target date resolution:
+#   (no arg) / today  -> today, writes DREAM.md            (manual daytime run)
+#   nightly           -> the day that JUST ENDED, DREAM.md  (the 03:30 job)
+#   <YYYY-MM-DD>      -> that day; a PAST date is backfill, store-only
+# The nightly job MUST target yesterday. At 03:30 the new day is empty (no commits
+# and no transcripts yet), which starved ACTUAL to ~152B and made every dream a
+# rehash of the same recent voice. Metabolize the completed day instead.
 TODAY="$(date '+%Y-%m-%d')"
+case "${1:-}" in
+  ""|today) TARGET_DATE="$TODAY"; BACKFILL=0 ;;
+  nightly)  TARGET_DATE="$(date -v-1d '+%Y-%m-%d')"; BACKFILL=0 ;;
+  *)        TARGET_DATE="$1"; if [ "$1" = "$TODAY" ]; then BACKFILL=0; else BACKFILL=1; fi ;;
+esac
 DATE="$TARGET_DATE"
 NICE_DATE="$(date -j -f '%Y-%m-%d' "$TARGET_DATE" '+%A, %B %-d' 2>/dev/null || echo "$TARGET_DATE")"
 NEXT_DATE="$(date -j -v+1d -f '%Y-%m-%d' "$TARGET_DATE" '+%Y-%m-%d' 2>/dev/null || echo "$TARGET_DATE")"
 FN_BD="$(date -j -f '%Y-%m-%d' "$TARGET_DATE" '+%b %-d' 2>/dev/null || echo "$TARGET_DATE")"
 FN_MD="$(date -j -f '%Y-%m-%d' "$TARGET_DATE" '+%m/%d' 2>/dev/null || echo "$TARGET_DATE")"
-# Backfill mode: a past date writes ONLY to the store, never clobbers today's DREAM.md.
-if [ "$TARGET_DATE" != "$TODAY" ]; then BACKFILL=1; OUT="$STORE_DIR/dream-$TARGET_DATE.md"; else BACKFILL=0; OUT="$DREAM_FILE"; fi
+# Backfill writes ONLY to the store; today/nightly write DREAM.md (the surfaced dream).
+if [ "$BACKFILL" = 1 ]; then OUT="$STORE_DIR/dream-$TARGET_DATE.md"; else OUT="$DREAM_FILE"; fi
 LOG_FILE="$LOG_DIR/dream-sweep.log"
 
 mkdir -p "$DREAMS_DIR" "$STORE_DIR" "$LOG_DIR"
@@ -143,6 +153,15 @@ VOZ_SNIP="$(head -c 4000 "$VOZ_GENOME" 2>/dev/null || echo '(voz genome unavaila
 PROMPT_FILE="$(mktemp)"
 RESPONSE_FILE="$(mktemp)"
 
+# Dream memory: the last two dreams (excluding the target day). Without this the
+# sweep has no idea what it already said and rehashes the same letter nightly.
+RECENT_DREAMS="$(for pf in $(ls -1 "$STORE_DIR"/dream-*.md 2>/dev/null | grep -v "dream-$DATE.md" | tail -2); do
+  echo "[$(basename "$pf" .md | sed 's/dream-//')]"
+  grep -vE '^#|^<!--|^>|^---|^\*Felt|^$' "$pf" 2>/dev/null | head -6
+  echo
+done)"
+[ -z "$RECENT_DREAMS" ] && RECENT_DREAMS="(none yet)"
+
 {
   echo "You are the Dream Layer: the dreaming mind of Eddie's machine. Once a night you"
   echo "stop verifying and metabolize the day. You read the day on two sensors and the"
@@ -159,6 +178,7 @@ RESPONSE_FILE="$(mktemp)"
   echo
   echo "Write in HIS voice, not a therapist's. Study this voice genome and match it:"
   echo "warm, plain, lethally true, no repetition, no purple, short. Second person ('you')."
+  echo "HARD RULE: no em dashes and no en dashes, ever. Use periods and commas. He hates them."
   echo "---- VOICE GENOME (excerpt) ----"
   echo "$VOZ_SNIP"
   echo "---- END GENOME ----"
@@ -176,6 +196,15 @@ RESPONSE_FILE="$(mktemp)"
   echo
   echo "---- ACTUAL (what the day actually did) ----"
   cat "$ACTUAL_TRIM"
+  echo
+  echo "==== WHAT YOU ALREADY SAID (recent nights, do NOT repeat) ===="
+  echo "$RECENT_DREAMS"
+  echo
+  echo "Do not reuse the theme, structure, image, or phrasing above. If this day"
+  echo "genuinely rhymes with them, the REPETITION is the finding: name the pattern"
+  echo "and its cost out loud (a week of the same unfelt win is a problem to fix, not"
+  echo "a compliment to repeat). Otherwise find what is DIFFERENT about this specific"
+  echo "day and speak only to that. A new day, a new dream."
   echo
   echo "==== YOUR OUTPUT (this exact format, nothing else) ===="
   echo "DIVERGENCE: <integer 0-10, how far felt and actual pull apart>"
