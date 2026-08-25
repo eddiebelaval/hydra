@@ -250,6 +250,9 @@ DIRECTION="$(grep -m1 -iE '^DIRECTION:' "$RESPONSE_FILE" | sed -E 's/^[Dd][Ii][R
 DIVERGENCE="${DIVERGENCE:-0}"; DIRECTION="${DIRECTION:-aligned}"
 BODY="$(awk 'f{print} /^---[[:space:]]*$/{f=1}' "$RESPONSE_FILE")"
 [ -z "$BODY" ] && BODY="$(sed -E '/^DIVERGENCE:/d; /^DIRECTION:/d; /^---[[:space:]]*$/d' "$RESPONSE_FILE")"
+# Deterministic no-dash guarantee: strip any em/en dash the model slipped in,
+# collapsing it to a comma. The prompt rule reduces them; this makes it zero.
+BODY="$(printf '%s' "$BODY" | perl -CSD -pe 's/\s*[\x{2014}\x{2013}]\s*/, /g' 2>/dev/null || printf '%s' "$BODY")"
 
 # Loudness: high divergence earns a banner (like the sentinel's YELLOW).
 if [ "${DIVERGENCE:-0}" -ge 6 ]; then LOUD="LOUD"; BANNER="> **Read this one.** The day diverged hard ($DIRECTION)."; else LOUD="quiet"; BANNER=""; fi
