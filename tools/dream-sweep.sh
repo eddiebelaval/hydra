@@ -138,7 +138,7 @@ log "gathered felt=${FELT_BYTES}B actual=${ACTUAL_BYTES}B"
 if [ "${FELT_BYTES:-0}" -lt 60 ] && [ "${ACTUAL_BYTES:-0}" -lt 60 ]; then
   log "no signal on either sensor; skipping dream"
   {
-    echo "# The Dream — $NICE_DATE"
+    echo "# The Dream, $NICE_DATE"
     echo
     echo "*Quiet night. The day left little trace on either sensor; nothing to metabolize.*"
   } > "$OUT"
@@ -235,7 +235,7 @@ if ! bad_resp "$RESPONSE_FILE"; then
 else
   log "model call failed on both profiles; writing fallback"
   {
-    echo "# The Dream — $NICE_DATE"
+    echo "# The Dream, $NICE_DATE"
     echo
     echo "*The dream did not form tonight (the model was unreachable). The day's signal"
     echo "is held in the log; try again tomorrow.*"
@@ -258,7 +258,7 @@ BODY="$(printf '%s' "$BODY" | perl -CSD -pe 's/\s*[\x{2014}\x{2013}]\s*/, /g' 2>
 if [ "${DIVERGENCE:-0}" -ge 6 ]; then LOUD="LOUD"; BANNER="> **Read this one.** The day diverged hard ($DIRECTION)."; else LOUD="quiet"; BANNER=""; fi
 
 {
-  echo "# The Dream — $NICE_DATE"
+  echo "# The Dream, $NICE_DATE"
   echo
   echo "<!-- divergence=$DIVERGENCE direction=$DIRECTION loud=$LOUD billed=$BILLED generated=$(date '+%Y-%m-%dT%H:%M:%S%z') -->"
   [ -n "$BANNER" ] && { echo "$BANNER"; echo; }
