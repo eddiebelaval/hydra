@@ -27,7 +27,7 @@ BRAIN="$HOME/.claude/projects/-Users-eddiebelaval-Development-id8/memory"
 PALACE="$HOME/.mempalace/palace"
 WING="canonical_brain"
 
-LOG_DIR="$HOME/Library/Logs/mempalace-canonical-sync"
+LOG_DIR="$HOME/Library/Logs/claude-automation/mempalace-canonical-sync"
 mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/$(date +%Y-%m-%d).log"
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG"; }
@@ -40,9 +40,13 @@ log "=== canonical sync start ==="
 
 # 1. Clear the wing so edits + deletions propagate (faithful mirror).
 DELETED=$("$PY" - "$PALACE" "$WING" <<'PYEOF' 2>>"$LOG"
-import sys, chromadb
+import sys, os, chromadb
 palace, wing = sys.argv[1], sys.argv[2]
-col = chromadb.PersistentClient(path=palace).get_collection("mempalace_drawers")
+if os.environ.get("MEMPALACE_CHROMA_HTTP"):  # single-owner: talk to the shared chroma server
+    _c = chromadb.HttpClient(host=os.environ.get("MEMPALACE_CHROMA_HOST", "127.0.0.1"), port=int(os.environ.get("MEMPALACE_CHROMA_PORT", "8009")))
+else:
+    _c = chromadb.PersistentClient(path=palace)
+col = _c.get_collection("mempalace_drawers")
 before = len(col.get(where={"wing": wing}, limit=1000000).get("ids", []))
 if before:
     col.delete(where={"wing": wing})
@@ -58,9 +62,13 @@ fi
 
 # 3. Verify + report (explicit STATUS line; never inferred from exit code alone).
 AFTER=$("$PY" - "$PALACE" "$WING" <<'PYEOF' 2>>"$LOG"
-import sys, chromadb
+import sys, os, chromadb
 palace, wing = sys.argv[1], sys.argv[2]
-col = chromadb.PersistentClient(path=palace).get_collection("mempalace_drawers")
+if os.environ.get("MEMPALACE_CHROMA_HTTP"):  # single-owner: talk to the shared chroma server
+    _c = chromadb.HttpClient(host=os.environ.get("MEMPALACE_CHROMA_HOST", "127.0.0.1"), port=int(os.environ.get("MEMPALACE_CHROMA_PORT", "8009")))
+else:
+    _c = chromadb.PersistentClient(path=palace)
+col = _c.get_collection("mempalace_drawers")
 print(len(col.get(where={"wing": wing}, limit=1000000).get("ids", [])))
 PYEOF
 )
