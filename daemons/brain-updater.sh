@@ -114,7 +114,11 @@ for repo_entry in "${REPO_LIST[@]}"; do
         continue
     fi
 
-    commit_count=$(echo "$commits" | wc -l | tr -d ' ')
+    # True count via rev-list, independent of the --max-count=20 display cap
+    # above. Counting the capped log's lines reported a fixed ceiling , the
+    # 2026-09-18 "always N" bug. Fall back to the window only if rev-list fails.
+    commit_count=$(git -C "$REPO_PATH" rev-list --count --since="7 days ago" HEAD 2>/dev/null)
+    [[ -z "$commit_count" || ! "$commit_count" =~ ^[0-9]+$ ]] && commit_count=$(echo "$commits" | wc -l | tr -d ' ')
     log "Found $commit_count new commits in $REPO_NAME"
     CHANGES_FOUND=true
 

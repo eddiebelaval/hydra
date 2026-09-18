@@ -60,12 +60,21 @@ TODAYS_COMMITS=""
 COMMIT_CACHE=$(mktemp -d)
 trap 'rm -rf "$COMMIT_CACHE"' EXIT
 
+# Explicit local-midnight boundary. git's approxidate "today" is unreliable
+# (it resolved to a window that returned 0 even with 22 commits since midnight ,
+# 2026-09-18), so pin the day boundary to an ISO timestamp instead.
+SINCE_MIDNIGHT="$(date '+%Y-%m-%d') 00:00:00"
+
 for repo_entry in "${HYDRA_REPOS[@]}"; do
     parse_repo "$repo_entry"
     if [[ -d "$REPO_PATH/.git" ]]; then
-        commits=$(git -C "$REPO_PATH" log --oneline --since="today" --max-count=10 2>/dev/null || echo "")
+        commits=$(git -C "$REPO_PATH" log --oneline --since="$SINCE_MIDNIGHT" --max-count=10 2>/dev/null || echo "")
         if [[ -n "$commits" ]]; then
-            commit_count=$(echo "$commits" | wc -l | tr -d ' ')
+            # True count via rev-list, independent of the --max-count=10 display
+            # cap above (the 2026-09-18 "always N" bug). Fall back to the capped
+            # window only if rev-list fails.
+            commit_count=$(git -C "$REPO_PATH" rev-list --count --since="$SINCE_MIDNIGHT" HEAD 2>/dev/null)
+            [[ -z "$commit_count" || ! "$commit_count" =~ ^[0-9]+$ ]] && commit_count=$(echo "$commits" | wc -l | tr -d ' ')
             TODAYS_COMMITS+="$REPO_NAME ($commit_count):
 $(echo "$commits" | sed 's/^/  /')
 
