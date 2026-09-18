@@ -171,6 +171,13 @@ INSERT OR IGNORE INTO agents (id, name, role, session_key, model, heartbeat_minu
     ('pulse', 'PULSE', 'ops', 'pulse', 'synthetic/hf:meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8', 30, '["architecture","devops","operations","compliance"]', 'cheap'),
     ('ava', 'AVA', 'autonomy', 'ava', 'anthropic/claude-opus-4-6', 0, '["code","landing-page","self-maintenance"]', 'premium');
 
+-- The human owner. Not a daemon, but tasks.assigned_to references agents(id),
+-- and both create_task/add_todo assign to 'eddie' (and the read side filters on
+-- it), so 'eddie' must exist on the roster or every task insert fails the FK.
+-- (2026-09-18: this row was missing, breaking Milo's own task tracking.)
+INSERT OR IGNORE INTO agents (id, name, role, session_key, model, heartbeat_minutes, skills_filter, cost_tier, status) VALUES
+    ('eddie', 'Eddie', 'owner', 'eddie', 'human', 0, '["all"]', 'premium', 'active');
+
 -- ============================================================================
 -- TRIGGERS: Auto-update timestamps
 -- ============================================================================
