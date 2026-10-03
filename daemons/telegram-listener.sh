@@ -540,7 +540,7 @@ GOALS_FILE="$HYDRA_ROOT/GOALS.md"
 
 # Agent Coordination Layer (shared state across Claude Code, Milo, HYDRA)
 # Every file here is also visible to other entities via MEMORY.md auto-load.
-COORDINATION_ROOT="${COORDINATION_ROOT:-$HOME/.claude/projects/-Users-eddiebelaval-Development/memory}"
+COORDINATION_ROOT="${COORDINATION_ROOT:-$HOME/.claude/projects/-Users-eddiebelaval-Development-id8/memory}"
 # Lock-in threshold: >= 2h gap triggers proactive catch-up surfacing
 # Per-user state files live at $STATE_DIR/hydra-telegram-last-${user_id}-epoch.txt
 HYDRA_LOCKIN_THRESHOLD="${HYDRA_LOCKIN_THRESHOLD:-7200}"

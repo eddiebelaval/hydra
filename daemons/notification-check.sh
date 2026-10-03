@@ -34,6 +34,17 @@ log "Notification check started"
 # STEP 1: Check for urgent undelivered notifications
 # ============================================================================
 
+# Expire notifications nobody delivered within 48h, so one stale row cannot raise an
+# "urgent" alert every 30 minutes forever (three April/May task notices did exactly that).
+EXPIRED=$(sqlite3 "$HYDRA_DB" "
+    UPDATE notifications SET delivered = 1, delivered_at = datetime('now')
+    WHERE delivered = 0 AND created_at < datetime('now', '-2 days');
+    SELECT changes();
+" 2>/dev/null || echo "0")
+if [[ "$EXPIRED" -gt 0 ]]; then
+    log "Expired $EXPIRED undelivered notification(s) older than 48h (never delivered)"
+fi
+
 URGENT_COUNT=$(sqlite3 "$HYDRA_DB" "
     SELECT COUNT(*) FROM notifications
     WHERE delivered = 0 AND priority = 'urgent';

@@ -66,6 +66,14 @@ if [[ -z "$CHANNEL" ]] || [[ -z "$SENDER" ]] || [[ -z "$CONTENT" ]]; then
     exit 1
 fi
 
+# Identifiers are spliced into SQL below; only the content is escaped. Allow slugs only.
+for _ident in "$CHANNEL" "$SENDER" "${THREAD_ID:-x}"; do
+    if [[ ! "$_ident" =~ ^[A-Za-z0-9_.:@-]{1,64}$ ]]; then
+        echo "hydra-route-message: channel, sender and thread must be simple identifiers" >&2
+        exit 1
+    fi
+done
+
 # Generate IDs
 MESSAGE_ID=$(uuidgen | tr '[:upper:]' '[:lower:]')
 if [[ -z "$THREAD_ID" ]]; then

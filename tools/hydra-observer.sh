@@ -446,7 +446,7 @@ if [[ -f "$BOARD_POST" ]]; then
     if [[ -n "$CRITICAL_OBS" ]]; then
         while IFS= read -r obs_line; do
             if [[ -n "$obs_line" ]]; then
-                "$BOARD_POST" "coordination" "observer" "$obs_line" --tags "critical,auto" 2>/dev/null || true
+                "$BOARD_POST" "coordination" "observer" "$obs_line" --tags "critical,auto" --dedupe-hours 24 2>/dev/null || true
             fi
         done <<< "$CRITICAL_OBS"
         BOARD_COUNT=$(echo "$CRITICAL_OBS" | grep -c . || true)
