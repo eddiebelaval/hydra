@@ -33,6 +33,38 @@ notify() {
   /usr/bin/osascript -e "display notification \"$1\" with title \"Memory snapshot\" sound name \"Basso\"" 2>/dev/null || true
 }
 
+# Push and PROVE it landed. From 2026-08-23 to 2026-09-06 this script logged
+# "pushed to origin/main" nightly while GitHub sat at Aug 23: the repo was parked
+# on a hackathon branch, so `git push origin main` pushed a stale main and exited 0.
+# Now: fast-forward $BRANCH to HEAD when it is an ancestor (never checkout; parallel
+# sessions may be live), push, re-fetch, compare refs. Mismatch is a loud failure.
+verified_push() {
+  local cur; cur=$(git branch --show-current)
+  if [ -n "$cur" ] && [ "$cur" != "$BRANCH" ]; then
+    if git merge-base --is-ancestor "$BRANCH" HEAD; then
+      git branch -f "$BRANCH" HEAD
+      echo "$STAMP  fast-forwarded $BRANCH to HEAD (repo parked on $cur)"
+    else
+      echo "$STAMP  PUSH SKIPPED: $BRANCH diverged from HEAD on $cur"
+      notify "Memory snapshot: $BRANCH diverged from $cur; not pushed"
+      return 1
+    fi
+  fi
+  if ! git push --quiet origin "$BRANCH" 2>/dev/null; then
+    echo "$STAMP  push failed (offline or rejected); will retry next run"
+    return 1
+  fi
+  git fetch --quiet origin "$BRANCH" 2>/dev/null || true
+  local l r; l=$(git rev-parse "$BRANCH"); r=$(git rev-parse "origin/$BRANCH" 2>/dev/null || echo none)
+  if [ "$l" = "$r" ]; then
+    echo "$STAMP  VERIFIED off-site: origin/$BRANCH = $l"
+  else
+    echo "$STAMP  PUSH UNVERIFIED: origin/$BRANCH=$r != $BRANCH=$l"
+    notify "Memory snapshot: push did not land on origin/$BRANCH"
+    return 1
+  fi
+}
+
 cd "$REPO" || { echo "cannot cd $REPO"; exit 1; }
 
 # Assert we are in the repo we think we are (feedback_force_push_scripts_assert_repo_identity).
@@ -93,9 +125,9 @@ git add -A "$SCOPE" 2>/dev/null || true
 
 if git diff --cached --quiet -- "$SCOPE"; then
   echo "$STAMP  no memory changes"
-  # Still push if the rebase pulled in commits we have not shared yet.
+  # Still push if there are commits we have not shared yet.
   if [ "${SNAPSHOT_PUSH:-0}" = "1" ] && [ -n "$(git log --oneline "origin/$BRANCH..HEAD" 2>/dev/null)" ]; then
-    git push --quiet origin "$BRANCH" 2>/dev/null && echo "$STAMP  pushed pending commits"
+    verified_push
   fi
   exit 0
 fi
@@ -150,7 +182,7 @@ A=$(git diff --cached --name-status -- "$SCOPE" | awk '$1=="A"' | wc -l | tr -d 
 M=$(git diff --cached --name-status -- "$SCOPE" | awk '$1=="M"' | wc -l | tr -d ' ')
 R=$(git diff --cached --name-status -- "$SCOPE" | awk '$1 ~ /^R/' | wc -l | tr -d ' ')
 
-git commit -q -m "chore(memory): snapshot $STAMP" \
+git commit -q -m "job(memory): snapshot $STAMP" \
   -m "Automated heartbeat of the live memory brain. ${A} added, ${M} modified, ${R} moved, ${DELETED} removed." \
   -m "Not pushed; shipping stays a human gate."
 
@@ -160,9 +192,5 @@ echo "$STAMP  committed: ${A}A ${M}M ${R}R ${DELETED}D"
 # Publish so the other machine can pull it. Non-fatal: a failed push just means
 # the next run carries both snapshots up.
 if [ "${SNAPSHOT_PUSH:-0}" = "1" ]; then
-  if git push --quiet origin "$BRANCH" 2>/dev/null; then
-    echo "$STAMP  pushed to origin/$BRANCH"
-  else
-    echo "$STAMP  push failed (offline or rejected); will retry next run"
-  fi
+  verified_push
 fi
