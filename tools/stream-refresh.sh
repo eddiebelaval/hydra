@@ -68,12 +68,18 @@ if [ ! -e "$LEX/.git" ]; then
 fi
 cd "$LEX" || { note "cannot cd to runner $LEX"; finish; }
 
-# Proof the cwd IS the runner before anything resets: a non-worktree dir here would make git
-# resolve to an enclosing repo, and a hard reset there would wipe someone's work.
+# Proof the cwd IS the dedicated runner before anything resets. Each check closes a way a hard
+# reset could land on someone's work (poll f49e992 L6 reproduced the first two in a sandbox):
+#   a symlink to the operator's checkout, a worktree with a branch checked out, a worktree of
+#   some other repo, a non-worktree dir resolving to an enclosing repo, or uncommitted edits.
+refuse() { note "runner $LEX: $1; refusing to reset"; finish; }
+[ -L "$LEX" ] && refuse "is a symlink"
 TOP="$(git rev-parse --show-toplevel 2>/dev/null || echo none)"
-if [ "$(cd "$TOP" 2>/dev/null && pwd -P)" != "$(pwd -P)" ]; then
-  note "runner $LEX resolves to git top-level $TOP, not itself; refusing to reset"; finish
-fi
+[ "$(cd "$TOP" 2>/dev/null && pwd -P)" = "$(pwd -P)" ] || refuse "resolves to git top-level $TOP, not itself"
+git symbolic-ref -q HEAD >/dev/null && refuse "has branch $(git symbolic-ref --short -q HEAD) checked out (the runner is always detached)"
+COMMON="$(cd "$(git rev-parse --git-common-dir 2>/dev/null)" 2>/dev/null && pwd -P)"
+[ "$COMMON" = "$(cd "$MAIN/.git" 2>/dev/null && pwd -P)" ] || refuse "belongs to $COMMON, not $MAIN"
+[ -z "$(git status --porcelain 2>/dev/null)" ] || refuse "has uncommitted changes"
 
 # 1. UPDATE. The runner is dedicated: reset, never merge. Strays are kept on a branch.
 if git fetch origin main --quiet 2>/dev/null; then
@@ -116,7 +122,7 @@ if [ "$NEW" -gt 0 ]; then run reconcile; RC="$(echo "$OUT" | tail -1)"; fi
 HL='heal skipped (done today)'
 if [ "$(cat "$HEAL_STAMP" 2>/dev/null)" != "$(date +%F)" ] || [ "$NEW" -gt 0 ]; then
   run heal; HL="$(echo "$OUT" | tail -1)"
-  echo "$HL" | grep -q '"closed"' && date +%F > "$HEAL_STAMP"
+  if echo "$HL" | grep -q '"closed"'; then date +%F > "$HEAL_STAMP"; else note "heal gave no result: $(echo "$HL" | cut -c1-120)"; fi
 fi
 run recompute
 
