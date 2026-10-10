@@ -40,7 +40,6 @@ case "${1:-}" in
 esac
 DATE="$TARGET_DATE"
 NICE_DATE="$(date -j -f '%Y-%m-%d' "$TARGET_DATE" '+%A, %B %-d' 2>/dev/null || echo "$TARGET_DATE")"
-NEXT_DATE="$(date -j -v+1d -f '%Y-%m-%d' "$TARGET_DATE" '+%Y-%m-%d' 2>/dev/null || echo "$TARGET_DATE")"
 FN_BD="$(date -j -f '%Y-%m-%d' "$TARGET_DATE" '+%b %-d' 2>/dev/null || echo "$TARGET_DATE")"
 FN_MD="$(date -j -f '%Y-%m-%d' "$TARGET_DATE" '+%m/%d' 2>/dev/null || echo "$TARGET_DATE")"
 # Backfill writes ONLY to the store; today/nightly write DREAM.md (the surfaced dream).
@@ -62,13 +61,16 @@ log "dream-sweep start ($DATE)"
 # ---------------------------------------------------------------------------
 ACTUAL_FILE="$(mktemp)"
 {
-  echo "## Git across the estate (since midnight)"
-  for repo in "$HOME_DIR/Development/id8" "$HYDRA" "$HOME_DIR/.claude" \
-              "$HOME_DIR/Development/id8/lexicon" "$HOME_DIR/Development/id8/id8labs"; do
+  echo "## Git across the estate (the target day, local time)"
+  # Every repo, not a hand-picked five: client work (Data-Tech, Resonance, D&B) lives
+  # outside id8, and a day spent there read as "quiet". Worktrees share the parent's
+  # objects, so they are skipped to avoid double counting. wip snapshots are noise.
+  { echo "$HYDRA"; echo "$HOME_DIR/.claude"
+    find "$HOME_DIR/Development" -maxdepth 3 -name .git -not -path '*/.worktrees/*' -not -path '*/node_modules/*' 2>/dev/null | sed 's#/\.git$##'
+  } | sort -u | while read -r repo; do
     [ -d "$repo/.git" ] || [ -f "$repo/.git" ] || continue
-    name="$(basename "$repo")"
-    commits="$(git -C "$repo" log --since="$DATE 00:00" --until="$DATE 23:59:59" --pretty='  %s' --no-merges 2>/dev/null | grep -viE 'chore\(eod\)|nightly snapshot' | head -25 || true)"
-    [ -n "$commits" ] && { echo "### $name"; echo "$commits"; }
+    commits="$(git -C "$repo" log --all --since="$DATE 00:00" --until="$DATE 23:59:59" --pretty='  %s' --no-merges 2>/dev/null | grep -viE 'chore\(eod\)|nightly snapshot|^  wip: session snapshot|^  wip:' | sort -u | head -12 || true)"
+    [ -n "$commits" ] && { echo "### ${repo#$HOME_DIR/}"; echo "$commits"; }
   done
   echo
   echo "## FIELD_NOTES lines dated today"
@@ -82,51 +84,71 @@ ACTUAL_FILE="$(mktemp)"
 # ---------------------------------------------------------------------------
 FELT_FILE="$(mktemp)"
 PROJECTS="$HOME_DIR/.claude/projects"
-{
-  # Session files modified today, top-level only (skip subagents/ and this sweep's noise).
-  find "$PROJECTS" -maxdepth 2 -name '*.jsonl' -not -path '*/subagents/*' -newermt "$DATE 00:00" ! -newermt "$NEXT_DATE 00:00" 2>/dev/null \
-    | while read -r f; do
-        # Extract user message text; drop hook/system/command/tool noise.
-        python3 - "$f" 2>/dev/null <<'PYEOF' || true
-import json, sys
-path = sys.argv[1]
-out = []
-try:
-    with open(path, encoding="utf-8", errors="ignore") as fh:
+# TIMING (fixed 2026-10-10): sessions run for days and across midnight. The old gather
+# picked files whose LAST write fell inside the day, then fed each file's last 40
+# messages regardless of when they were said. Result: any session still open after
+# midnight was dropped (Oct 9 saw 24 of 126 messages), and any long session that
+# happened to close that day dragged in words from 3-5 days earlier (Oct 7 was fed
+# Oct 2-6), so the dream kept re-reading the same stretch. Now: every session touched
+# on or after the day, every message filtered by its OWN timestamp in local time,
+# merged across sessions chronologically, then sampled evenly across the day.
+find "$PROJECTS" -maxdepth 2 -name '*.jsonl' -not -path '*/subagents/*' -newermt "$DATE 00:00" 2>/dev/null \
+  | python3 -c '
+import json, sys, datetime
+day = sys.argv[1]
+NOISE = ("system-reminder", "temporal context", "caveat:", "command-name",
+         "local-command", "tool_use_error", "<bash-", "hook success", "hook error")
+MACHINE = ("Another Claude session sent a message", "Here is a note offered by",
+           "This session is being continued", "Base directory for this skill")
+msgs = []
+for path in sys.stdin:
+    path = path.strip()
+    try:
+        fh = open(path, encoding="utf-8", errors="ignore")
+    except Exception:
+        continue
+    with fh:
         for line in fh:
             try:
                 o = json.loads(line)
             except Exception:
                 continue
-            if o.get("type") != "user":
+            if o.get("type") != "user" or not o.get("timestamp"):
                 continue
-            msg = o.get("message", {})
-            content = msg.get("content")
-            text = ""
+            # Only words Eddie typed: interactive CLI turns. Scheduled claude -p jobs
+            # (sdk-*), injected meta turns (/loop pulses, skill bodies) and cross-session
+            # hand-backs are the machine talking, not him. Counting them made the dream
+            # say his only words were "pasted security prompts and drain protocols".
+            if o.get("entrypoint") != "cli" or o.get("isMeta"):
+                continue
+            try:
+                ts = datetime.datetime.fromisoformat(o["timestamp"].replace("Z", "+00:00")).astimezone()
+            except Exception:
+                continue
+            if ts.date().isoformat() != day:
+                continue
+            content = o.get("message", {}).get("content")
             if isinstance(content, str):
-                text = content
+                t = content
             elif isinstance(content, list):
-                text = " ".join(p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text")
-            t = text.strip()
-            if not t:
+                t = " ".join(p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text")
+            else:
+                t = ""
+            t = t.strip()
+            if not t or t.startswith(("{", "[", "<", "/")) or t.startswith(MACHINE) or any(k in t.lower() for k in NOISE):
                 continue
-            low = t.lower()
-            if any(k in low for k in ("system-reminder", "temporal context", "caveat:", "command-name",
-                                       "local-command", "tool_use_error", "<bash-", "hook success", "hook error")):
-                continue
-            if t.startswith(("{", "[", "<")):
-                continue
-            out.append(t)
-except Exception:
-    pass
-# His voice, most recent last; cap.
-for t in out[-40:]:
-    print("- " + t[:400].replace("\n", " "))
-PYEOF
-      done
-} > "$FELT_FILE" 2>/dev/null || true
+            msgs.append((ts, t))
+msgs.sort(key=lambda m: m[0])
+# Even sample across the whole day (morning to night), not just the tail.
+CAP = 45
+if len(msgs) > CAP:
+    step = len(msgs) / CAP
+    msgs = [msgs[int(i * step)] for i in range(CAP - 1)] + [msgs[-1]]
+for ts, t in msgs:
+    print("- [" + ts.strftime("%H:%M") + "] " + t[:200].replace("\n", " "))
+' "$DATE" > "$FELT_FILE" 2>/dev/null || true
 
-# Cap felt volume (keep the tail = the day's most recent voice).
+# Cap felt volume (already day-scoped and sampled; this is a safety net).
 FELT_TRIM="$(mktemp)"; tail -c 9000 "$FELT_FILE" > "$FELT_TRIM" 2>/dev/null || true
 ACTUAL_TRIM="$(mktemp)"; head -c 6000 "$ACTUAL_FILE" > "$ACTUAL_TRIM" 2>/dev/null || true
 
