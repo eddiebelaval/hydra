@@ -148,3 +148,19 @@ with_coordinator() {
     [ "$status" -eq 2 ]
     [[ "$output" == *'subagent_type="prometheus"'* ]]
 }
+
+@test "release-gate: --help with only an output redirect after it is a read" {
+    must_pass 'vercel domains rm --help 2>&1' 'vercel promote --help 2>/dev/null' 'git push --help 2>&1'
+}
+
+@test "release-gate: a redirect does not launder a real mint" {
+    must_block 'git push origin main 2>&1' 'git push -o --help origin main 2>&1' 'git tag v1.0 2>/dev/null'
+}
+
+@test "release-gate: the coordinator prompt carries preflight, all-six and station models" {
+    run gate_out 'git push origin main'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"preflight; launch no station until it passes"* ]]
+    [[ "$output" == *"L1 on Sonnet, L2-L6 on Opus"* ]]
+    [[ "$output" == *"once ALL six sealed"* ]]
+}
