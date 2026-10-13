@@ -164,3 +164,9 @@ with_coordinator() {
     [[ "$output" == *"L1 on Sonnet, L2-L6 on Opus"* ]]
     [[ "$output" == *"once ALL six sealed"* ]]
 }
+
+@test "release-gate: a request closes go/hold when all six seal, and recycle reopens it" {
+  run python3 "$BATS_TEST_DIRNAME/prometheus_close_test.py"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *PASS* ]]
+}
