@@ -1,0 +1,5 @@
+#!/bin/bash
+# hydra-llm - shell door to the Hydra LLM gateway (~/.hydra/lib/hydra_llm.py).
+# Prompt on stdin, answer on stdout. Exit 0 ok, 75 skipped (log and move on), 1 failed.
+# Spec: ~/.hydra/docs/LLM-GATEWAY.md
+exec python3 "${HYDRA_ROOT:-$HOME/.hydra}/lib/hydra_llm.py" "$@"

@@ -1,0 +1,24 @@
+{
+  "_doc": "Hydra LLM gateway config. See ~/.hydra/docs/LLM-GATEWAY.md. Jobs name a task + tier; this file maps them to lanes and models.",
+  "tiers": {
+    "small": {"sub": "haiku", "api": "claude-haiku-4-5-20251001"},
+    "mid":   {"sub": "sonnet", "api": "claude-sonnet-5"},
+    "large": {"sub": "opus", "api": "claude-opus-5-5"}
+  },
+  "tasks": {
+    "decide":    ["subq", "sub", "api"],
+    "summarize": ["sub", "api"],
+    "extract":   ["sub", "api"],
+    "write":     ["sub", "api"],
+    "chat":      ["api", "sub"]
+  },
+  "budgets": {
+    "default": {"calls_per_day": 200}
+  },
+  "breaker": {
+    "rate_limit_minutes": 30,
+    "error_streak": 5,
+    "error_cooldown_minutes": 60
+  },
+  "subq": {"enabled": false, "keychain_service": "subq-api-key"}
+}

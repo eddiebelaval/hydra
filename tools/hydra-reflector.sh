@@ -19,7 +19,6 @@ set -euo pipefail
 
 HYDRA_ROOT="$HOME/.hydra"
 HYDRA_DB="$HYDRA_ROOT/hydra.db"
-HYDRA_ENV="$HYDRA_ROOT/config/telegram.env"
 BRAIN_FILE="$HYDRA_ROOT/TECHNICAL_BRAIN.md"
 STATE_FILE="$HYDRA_ROOT/state/reflector-state.json"
 
@@ -103,31 +102,22 @@ EXISTING_PATTERNS=$(sqlite3 "$HYDRA_DB" "
 # CONSOLIDATE WITH SONNET
 # ============================================================================
 
-API_KEY=""
-if [[ -f "$HYDRA_ENV" ]]; then
-    API_KEY=$(grep '^ANTHROPIC_API_KEY=' "$HYDRA_ENV" | head -1 | cut -d'"' -f2)
-fi
-
-if [[ -z "$API_KEY" ]]; then
-    log "ERROR: No API key available."
-    echo "Error: ANTHROPIC_API_KEY not configured in $HYDRA_ENV"
-    exit 1
-fi
 
 export REFLECTOR_OBS="$OBS_DATA"
 export REFLECTOR_EXISTING="$EXISTING_PATTERNS"
 export REFLECTOR_DATE="$DATE"
 export REFLECTOR_PERIOD_START="$SEVEN_DAYS_AGO"
-export ANTHROPIC_API_KEY="$API_KEY"
+export HYDRA_ROOT
 
 REFLECTIONS=$(python3 << 'PYEOF'
-import json, urllib.request, sys, os
+import sys, os
+sys.path.insert(0, os.path.join(os.environ.get("HYDRA_ROOT", os.path.expanduser("~/.hydra")), "lib"))
+from hydra_llm import complete, Skipped
 
 observations = os.environ.get("REFLECTOR_OBS", "")
 existing = os.environ.get("REFLECTOR_EXISTING", "")
 date = os.environ.get("REFLECTOR_DATE", "")
 period_start = os.environ.get("REFLECTOR_PERIOD_START", "")
-api_key = os.environ.get("ANTHROPIC_API_KEY", "")
 
 system_prompt = """You are a strategic advisor analyzing a software creator's work patterns over the past week.
 
@@ -156,44 +146,23 @@ if existing.strip():
 
 user_message = f"Consolidate observations from {period_start} to {date}:\n\n{observations}{existing_section}"
 
-data = json.dumps({
-    "model": "claude-sonnet-4-5-20250929",
-    "max_tokens": 1200,
-    "system": system_prompt,
-    "messages": [{"role": "user", "content": user_message}]
-}).encode()
-
 try:
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01"
-        }
-    )
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        result = json.loads(resp.read().decode())
-        text = result.get("content", [{}])[0].get("text", "").strip()
-
-        usage = result.get("usage", {})
-        input_tokens = usage.get("input_tokens", 0)
-        output_tokens = usage.get("output_tokens", 0)
-        print(f"TOKENS:{input_tokens}:{output_tokens}", file=sys.stderr)
-
-        if text:
-            print(text)
-        else:
-            print("Empty response from Sonnet", file=sys.stderr)
-            sys.exit(1)
+    text = complete("hydra-reflector", user_message, system=system_prompt, task="summarize", tier="mid", max_tokens=1200)
+except Skipped as e:
+    print(f"LLM skipped: {e}", file=sys.stderr)
+    sys.exit(75)
 except Exception as e:
-    print(f"Sonnet error: {e}", file=sys.stderr)
+    print(f"LLM error: {e}", file=sys.stderr)
     sys.exit(1)
+if not text:
+    sys.exit(1)
+print(text)
 PYEOF
-)
-
-SONNET_EXIT=$?
+) && SONNET_EXIT=0 || SONNET_EXIT=$?   # gateway call (docs/LLM-GATEWAY.md); set -e safe
+if [[ $SONNET_EXIT -eq 75 ]]; then
+    log "SKIPPED: LLM gateway has no open lane"
+    exit 0
+fi
 if [[ $SONNET_EXIT -ne 0 ]] || [[ -z "$REFLECTIONS" ]]; then
     log "ERROR: Sonnet consolidation failed (exit=$SONNET_EXIT)"
     "$HYDRA_ROOT/daemons/notify-eddie.sh" normal "Reflector Error" "Sonnet consolidation failed (exit=$SONNET_EXIT). Check reflector log." 2>/dev/null || true

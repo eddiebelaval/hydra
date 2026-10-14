@@ -21,7 +21,6 @@ set -euo pipefail
 
 HYDRA_ROOT="$HOME/.hydra"
 HYDRA_DB="$HYDRA_ROOT/hydra.db"
-HYDRA_ENV="$HYDRA_ROOT/config/telegram.env"
 STATE_FILE="$HYDRA_ROOT/state/observer-state.json"
 EVENT_BUFFER="$HYDRA_ROOT/state/event-buffer.log"
 OBSERVATIONS_MD="$HYDRA_ROOT/memory/observations.md"
@@ -263,28 +262,30 @@ log "Total event data: $EVENT_LENGTH chars"
 # COMPRESS WITH HAIKU
 # ============================================================================
 
-# Load API key
-API_KEY=""
-if [[ -f "$HYDRA_ENV" ]]; then
-    API_KEY=$(grep '^ANTHROPIC_API_KEY=' "$HYDRA_ENV" | head -1 | cut -d'"' -f2)
-fi
-
-if [[ -z "$API_KEY" ]]; then
-    log "ERROR: No API key available. Cannot compress events."
-    echo "Error: ANTHROPIC_API_KEY not configured in $HYDRA_ENV"
-    exit 1
-fi
-
+# The model call goes through the Hydra LLM gateway (lib/hydra_llm.py): it picks
+# the lane (subscription first, metered API as fallback), meters the call, and
+# pauses a capped lane instead of failing every run. docs/LLM-GATEWAY.md
 export OBSERVER_EVENTS="$ALL_EVENTS"
 export OBSERVER_DATE="$DATE"
-export ANTHROPIC_API_KEY="$API_KEY"
+export HYDRA_ROOT
+
+# The buffer was rotated and deleted above. If the call does not land, put the
+# Telegram events back so the next run sees them instead of losing them.
+requeue_buffer() {
+    if [[ -n "${BUFFER_CONTENT:-}" ]]; then
+        printf '%s\n' "$BUFFER_CONTENT" >> "$EVENT_BUFFER"
+        log "Re-queued $(echo "$BUFFER_CONTENT" | wc -l | tr -d ' ') buffer events for the next run"
+    fi
+}
 
 OBSERVATIONS=$(python3 << 'PYEOF'
-import json, urllib.request, sys, os
+import sys, os
+sys.path.insert(0, os.path.join(os.environ["HYDRA_ROOT"], "lib"))
+from hydra_llm import complete, Skipped
 
 events = os.environ.get("OBSERVER_EVENTS", "")
 date = os.environ.get("OBSERVER_DATE", "")
-api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+
 
 system_prompt = """You are a meticulous observer of a software creator's daily work and decisions.
 
@@ -310,48 +311,31 @@ Return ONLY the formatted observations. No headers, no explanation."""
 
 user_message = f"Compress these events from {date}:\n\n{events}"
 
-data = json.dumps({
-    "model": "claude-haiku-4-5-20251001",
-    "max_tokens": 800,
-    "system": system_prompt,
-    "messages": [{"role": "user", "content": user_message}]
-}).encode()
-
 try:
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01"
-        }
-    )
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        result = json.loads(resp.read().decode())
-        text = result.get("content", [{}])[0].get("text", "").strip()
-
-        # Log token usage for cost tracking
-        usage = result.get("usage", {})
-        input_tokens = usage.get("input_tokens", 0)
-        output_tokens = usage.get("output_tokens", 0)
-        print(f"TOKENS:{input_tokens}:{output_tokens}", file=sys.stderr)
-
-        if text:
-            print(text)
-        else:
-            print("", file=sys.stderr)
-            sys.exit(1)
+    text = complete("hydra-observer", user_message, system=system_prompt,
+                    task="summarize", tier="small", max_tokens=800)
+except Skipped as e:
+    print(f"LLM skipped: {e}", file=sys.stderr)
+    sys.exit(75)
 except Exception as e:
-    print(f"Haiku error: {e}", file=sys.stderr)
+    print(f"LLM error: {e}", file=sys.stderr)
     sys.exit(1)
+if not text:
+    sys.exit(1)
+print(text)
 PYEOF
-)
+) && HAIKU_EXIT=0 || HAIKU_EXIT=$?   # set -e would exit on a failed $(...) before this check
 
-HAIKU_EXIT=$?
+if [[ $HAIKU_EXIT -eq 75 ]]; then
+    # Every lane is paused (cap or budget); the gateway already alerted once. Not an error.
+    log "SKIPPED: LLM gateway has no open lane"
+    requeue_buffer
+    exit 0
+fi
 if [[ $HAIKU_EXIT -ne 0 ]] || [[ -z "$OBSERVATIONS" ]]; then
-    log "ERROR: Haiku compression failed (exit=$HAIKU_EXIT)"
-    "$HYDRA_ROOT/daemons/notify-eddie.sh" normal "Observer Error" "Haiku compression failed (exit=$HAIKU_EXIT). Check observer log." 2>/dev/null || true
+    log "ERROR: compression failed (exit=$HAIKU_EXIT)"
+    requeue_buffer
+    "$HYDRA_ROOT/daemons/notify-eddie.sh" normal "Observer Error" "Compression failed (exit=$HAIKU_EXIT). Check observer log." 2>/dev/null || true
     update_state "last_run" "$TIMESTAMP"
     exit 1
 fi

@@ -18,7 +18,6 @@ set -euo pipefail
 JOURNEY_FILE="$HOME/.hydra/JOURNEY.md"
 LOG_DIR="$HOME/Library/Logs/claude-automation/hydra-brain-updater"
 LOG_FILE="$LOG_DIR/journey-append.log"
-HYDRA_ENV="$HOME/.hydra/config/telegram.env"
 DATE=$(date +%Y-%m-%d)
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
@@ -71,26 +70,15 @@ log "Raw note: ${NOTE_TEXT:0:100}..."
 polish_with_haiku() {
     local raw_text="$1"
 
-    # Load API key
-    local api_key=""
-    if [[ -f "$HYDRA_ENV" ]]; then
-        api_key=$(grep '^ANTHROPIC_API_KEY=' "$HYDRA_ENV" | head -1 | cut -d'"' -f2)
-    fi
-
-    if [[ -z "$api_key" ]]; then
-        log "No API key found, skipping polish"
-        echo "$raw_text"
-        return
-    fi
-
     export HAIKU_RAW_TEXT="$raw_text"
-    export ANTHROPIC_API_KEY="$api_key"
+    export HYDRA_ROOT="${HYDRA_ROOT:-$HOME/.hydra}"
 
     local polished=$(python3 << 'PYEOF'
-import json, urllib.request, sys, os
+import sys, os
+sys.path.insert(0, os.path.join(os.environ["HYDRA_ROOT"], "lib"))
+from hydra_llm import complete
 
 raw_text = os.environ.get("HAIKU_RAW_TEXT", "")
-api_key = os.environ.get("ANTHROPIC_API_KEY", "")
 
 system_prompt = """You are editing a living document called JOURNEY.md that tells the story of Eddie Belaval building id8Labs. The document uses third-person narrative with a reflective, specific tone.
 
@@ -102,33 +90,13 @@ Take the user's raw session note and refine it into 2-4 sentences that fit JOURN
 
 Return ONLY the refined text, no explanation or quotes."""
 
-data = json.dumps({
-    "model": "claude-haiku-4-5-20251001",
-    "max_tokens": 300,
-    "system": system_prompt,
-    "messages": [{"role": "user", "content": raw_text}]
-}).encode()
-
+# Gateway call (docs/LLM-GATEWAY.md). Any failure or skip keeps the raw text.
 try:
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01"
-        }
-    )
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        result = json.loads(resp.read().decode())
-        text = result.get("content", [{}])[0].get("text", "").strip()
-        if text:
-            print(text)
-        else:
-            print(raw_text)
+    print(complete("journey-append", raw_text, system=system_prompt,
+                   task="write", tier="small", max_tokens=300, timeout=60) or raw_text)
 except Exception as e:
-    print(raw_text, file=sys.stdout)
-    print(f"Haiku error: {e}", file=sys.stderr)
+    print(raw_text)
+    print(f"LLM unavailable, keeping raw text: {e}", file=sys.stderr)
 PYEOF
 )
 

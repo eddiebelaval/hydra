@@ -18,7 +18,6 @@ BRAIN_FILE="$HOME/.hydra/TECHNICAL_BRAIN.md"
 STATE_FILE="$HOME/.hydra/state/brain-updater-state.json"
 LOG_DIR="$HOME/Library/Logs/claude-automation/hydra-brain-updater"
 LOG_FILE="$LOG_DIR/brain-updater.log"
-HYDRA_ENV="$HOME/.hydra/config/telegram.env"
 DATE=$(date +%Y-%m-%d)
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
@@ -155,26 +154,15 @@ log "Changes found, generating summary..."
 summarize_with_haiku() {
     local raw_commits="$1"
 
-    # Load API key
-    local api_key=""
-    if [[ -f "$HYDRA_ENV" ]]; then
-        api_key=$(grep '^ANTHROPIC_API_KEY=' "$HYDRA_ENV" | head -1 | cut -d'"' -f2)
-    fi
-
-    if [[ -z "$api_key" ]]; then
-        log "No API key, using raw commits as summary"
-        echo "$raw_commits"
-        return
-    fi
-
     export HAIKU_COMMITS="$raw_commits"
-    export ANTHROPIC_API_KEY="$api_key"
+    export HYDRA_ROOT="${HYDRA_ROOT:-$HOME/.hydra}"
 
     local summary=$(python3 << 'PYEOF'
-import json, urllib.request, sys, os
+import sys, os
+sys.path.insert(0, os.path.join(os.environ["HYDRA_ROOT"], "lib"))
+from hydra_llm import complete
 
 commits = os.environ.get("HAIKU_COMMITS", "")
-api_key = os.environ.get("ANTHROPIC_API_KEY", "")
 
 system_prompt = """You summarize git commit activity for a developer's knowledge base.
 
@@ -193,33 +181,13 @@ Format:
 
 Return ONLY the formatted summary, no explanation."""
 
-data = json.dumps({
-    "model": "claude-haiku-4-5-20251001",
-    "max_tokens": 500,
-    "system": system_prompt,
-    "messages": [{"role": "user", "content": commits}]
-}).encode()
-
+# Gateway call (docs/LLM-GATEWAY.md). Any failure or skip degrades to the raw commits.
 try:
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01"
-        }
-    )
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        result = json.loads(resp.read().decode())
-        text = result.get("content", [{}])[0].get("text", "").strip()
-        if text:
-            print(text)
-        else:
-            print(commits)
+    print(complete("hydra-brain-updater", commits, system=system_prompt,
+                   task="summarize", tier="small", max_tokens=500) or commits)
 except Exception as e:
-    print(commits, file=sys.stdout)
-    print(f"Haiku error: {e}", file=sys.stderr)
+    print(commits)
+    print(f"LLM unavailable, using raw commits: {e}", file=sys.stderr)
 PYEOF
 )
 

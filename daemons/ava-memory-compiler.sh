@@ -22,9 +22,6 @@ HYDRA_DB="$HYDRA_ROOT/hydra.db"
 AVA_MIND="$HYDRA_ROOT/ava-mind"
 STATE_DIR="$HYDRA_ROOT/state"
 CONV_HISTORY="$STATE_DIR/ava-conversation-history.json"
-HAIKU_MODEL="claude-haiku-4-5-20251001"
-API_URL="https://api.anthropic.com/v1/messages"
-API_VERSION="2023-06-01"
 API_TIMEOUT=30
 TMPDIR="${TMPDIR:-/tmp}"
 
@@ -46,18 +43,9 @@ for cmd in sqlite3 python3; do
     fi
 done
 
-# Load Anthropic API key
-ANTHROPIC_API_KEY=""
-if [[ -f "$HYDRA_ROOT/config/telegram.env" ]]; then
-    ANTHROPIC_API_KEY=$(grep '^ANTHROPIC_API_KEY=' "$HYDRA_ROOT/config/telegram.env" | head -1 | cut -d'"' -f2)
-fi
-
-if [[ -z "$ANTHROPIC_API_KEY" ]]; then
-    log "ERROR: No API key found. Exiting."
-    exit 1
-fi
-
-export ANTHROPIC_API_KEY HAIKU_MODEL API_URL API_VERSION API_TIMEOUT
+# Model calls go through the Hydra LLM gateway (lib/hydra_llm.py, docs/LLM-GATEWAY.md),
+# which owns lanes, credentials, metering and the breaker.
+export HYDRA_ROOT API_TIMEOUT
 
 # Atomic write: write to tmp file, then mv (safe against mid-write crashes)
 atomic_write() {
@@ -122,10 +110,11 @@ PYEOF
         AVA_MC_MEMS="$recent_memories" \
         AVA_MC_MOOD="$recent_mood" \
         python3 << 'PYEOF'
-import json, urllib.request, os, sys
+import json, os, sys
+sys.path.insert(0, os.path.join(os.environ["HYDRA_ROOT"], "lib"))
+from hydra_llm import complete, Skipped
 from datetime import datetime
 
-api_key = os.environ.get("ANTHROPIC_API_KEY", "")
 conv = os.environ.get("AVA_MC_CONV", "")
 mems = os.environ.get("AVA_MC_MEMS", "")
 mood = os.environ.get("AVA_MC_MOOD", "")
@@ -157,29 +146,12 @@ Rules:
 - If data is sparse, keep sections brief. Never fabricate.
 - Reference mood journal subtly, not as raw data."""
 
-data = json.dumps({
-    "model": os.environ.get("HAIKU_MODEL", "claude-haiku-4-5-20251001"),
-    "max_tokens": 1000,
-    "messages": [{"role": "user", "content": prompt}]
-}).encode()
-
 try:
-    req = urllib.request.Request(
-        os.environ.get("API_URL", "https://api.anthropic.com/v1/messages"),
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": os.environ.get("API_VERSION", "2023-06-01")
-        }
-    )
-    timeout = int(os.environ.get("API_TIMEOUT", "30"))
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        result = json.loads(resp.read().decode())
-        if "error" in result:
-            print(f"API error: {result['error']}", file=sys.stderr)
-            sys.exit(1)
-        print(result.get("content", [{}])[0].get("text", ""))
+    print(complete("ava-memory-compiler", prompt, task="write", tier="small",
+                   max_tokens=1000, timeout=int(os.environ.get("API_TIMEOUT", "30")) * 4))
+except Skipped as e:
+    print(f"LLM skipped: {e}", file=sys.stderr)
+    sys.exit(1)
 except Exception as e:
     print(f"Error: {e}", file=sys.stderr)
     sys.exit(1)
@@ -244,9 +216,10 @@ compile_patterns() {
         AVA_MC_PATTERNS="$comm_patterns" \
         AVA_MC_EXISTING="$existing_patterns" \
         python3 << 'PYEOF'
-import json, urllib.request, os, sys
+import json, os, sys
+sys.path.insert(0, os.path.join(os.environ["HYDRA_ROOT"], "lib"))
+from hydra_llm import complete, Skipped
 
-api_key = os.environ.get("ANTHROPIC_API_KEY", "")
 mood_dist = os.environ.get("AVA_MC_MOOD_DIST", "")
 patterns = os.environ.get("AVA_MC_PATTERNS", "")
 existing = os.environ.get("AVA_MC_EXISTING", "")
@@ -273,29 +246,12 @@ Task: Update the behavioral patterns file. Rules:
 8. Keep it concise — observations, not essays. Each bullet is one pattern.
 9. If the new data doesn't change anything, return the existing file unchanged."""
 
-data = json.dumps({
-    "model": os.environ.get("HAIKU_MODEL", "claude-haiku-4-5-20251001"),
-    "max_tokens": 1500,
-    "messages": [{"role": "user", "content": prompt}]
-}).encode()
-
 try:
-    req = urllib.request.Request(
-        os.environ.get("API_URL", "https://api.anthropic.com/v1/messages"),
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": os.environ.get("API_VERSION", "2023-06-01")
-        }
-    )
-    timeout = int(os.environ.get("API_TIMEOUT", "30"))
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        result = json.loads(resp.read().decode())
-        if "error" in result:
-            print(f"API error: {result['error']}", file=sys.stderr)
-            sys.exit(1)
-        print(result.get("content", [{}])[0].get("text", ""))
+    print(complete("ava-memory-compiler", prompt, task="write", tier="small",
+                   max_tokens=1500, timeout=int(os.environ.get("API_TIMEOUT", "30")) * 4))
+except Skipped as e:
+    print(f"LLM skipped: {e}", file=sys.stderr)
+    sys.exit(1)
 except Exception as e:
     print(f"Error: {e}", file=sys.stderr)
     sys.exit(1)
@@ -353,9 +309,10 @@ compile_relationships() {
     compiled=$(AVA_MC_NEW_RELS="$new_rels" \
         AVA_MC_EXISTING_RELS="$existing" \
         python3 << 'PYEOF'
-import json, urllib.request, os, sys
+import json, os, sys
+sys.path.insert(0, os.path.join(os.environ["HYDRA_ROOT"], "lib"))
+from hydra_llm import complete, Skipped
 
-api_key = os.environ.get("ANTHROPIC_API_KEY", "")
 new_rels = os.environ.get("AVA_MC_NEW_RELS", "")
 existing = os.environ.get("AVA_MC_EXISTING_RELS", "")
 
@@ -377,29 +334,12 @@ Task: Update the relationships file.
 7. If new data contradicts old data, the NEW data wins (things change).
 8. Keep it natural — narrative, not database entries."""
 
-data = json.dumps({
-    "model": os.environ.get("HAIKU_MODEL", "claude-haiku-4-5-20251001"),
-    "max_tokens": 1500,
-    "messages": [{"role": "user", "content": prompt}]
-}).encode()
-
 try:
-    req = urllib.request.Request(
-        os.environ.get("API_URL", "https://api.anthropic.com/v1/messages"),
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": os.environ.get("API_VERSION", "2023-06-01")
-        }
-    )
-    timeout = int(os.environ.get("API_TIMEOUT", "30"))
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        result = json.loads(resp.read().decode())
-        if "error" in result:
-            print(f"API error: {result['error']}", file=sys.stderr)
-            sys.exit(1)
-        print(result.get("content", [{}])[0].get("text", ""))
+    print(complete("ava-memory-compiler", prompt, task="write", tier="small",
+                   max_tokens=1500, timeout=int(os.environ.get("API_TIMEOUT", "30")) * 4))
+except Skipped as e:
+    print(f"LLM skipped: {e}", file=sys.stderr)
+    sys.exit(1)
 except Exception as e:
     print(f"Error: {e}", file=sys.stderr)
     sys.exit(1)
@@ -460,9 +400,10 @@ sync_goals() {
     compiled=$(AVA_MC_HYDRA_GOALS="$hydra_goals_content" \
         AVA_MC_EXISTING_GOALS="$existing" \
         python3 << 'PYEOF'
-import json, urllib.request, os, sys
+import json, os, sys
+sys.path.insert(0, os.path.join(os.environ["HYDRA_ROOT"], "lib"))
+from hydra_llm import complete, Skipped
 
-api_key = os.environ.get("ANTHROPIC_API_KEY", "")
 hydra_goals = os.environ.get("AVA_MC_HYDRA_GOALS", "")
 existing = os.environ.get("AVA_MC_EXISTING_GOALS", "")
 
@@ -482,29 +423,12 @@ Task: Update Eddie's goals file. Merge the HYDRA system goals with Ava's persona
 5. Write as Ava. Natural, not a copy-paste of HYDRA format.
 6. Keep it concise — bullet points are fine here."""
 
-data = json.dumps({
-    "model": os.environ.get("HAIKU_MODEL", "claude-haiku-4-5-20251001"),
-    "max_tokens": 1000,
-    "messages": [{"role": "user", "content": prompt}]
-}).encode()
-
 try:
-    req = urllib.request.Request(
-        os.environ.get("API_URL", "https://api.anthropic.com/v1/messages"),
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": os.environ.get("API_VERSION", "2023-06-01")
-        }
-    )
-    timeout = int(os.environ.get("API_TIMEOUT", "30"))
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        result = json.loads(resp.read().decode())
-        if "error" in result:
-            print(f"API error: {result['error']}", file=sys.stderr)
-            sys.exit(1)
-        print(result.get("content", [{}])[0].get("text", ""))
+    print(complete("ava-memory-compiler", prompt, task="write", tier="small",
+                   max_tokens=1000, timeout=int(os.environ.get("API_TIMEOUT", "30")) * 4))
+except Skipped as e:
+    print(f"LLM skipped: {e}", file=sys.stderr)
+    sys.exit(1)
 except Exception as e:
     print(f"Error: {e}", file=sys.stderr)
     sys.exit(1)
