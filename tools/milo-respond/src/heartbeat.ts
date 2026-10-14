@@ -19,10 +19,10 @@
  * Output: Composes a message through Milo's CaF voice and sends via Telegram.
  */
 
-import Anthropic from '@anthropic-ai/sdk'
 import Database from 'better-sqlite3'
 import fs from 'fs'
 import { execFileSync } from 'child_process'
+import { gatewayComplete } from './llm-gateway.js'
 import { composeMiloPrompt } from './caf-loader.js'
 import { runSelfRepair, type RepairReport } from './self-repair.js'
 import { hasPortfolioFile } from './portfolio-reader.js'
@@ -441,16 +441,14 @@ async function composeBeatMessage(beat: BeatType, items: TrackedItem[]): Promise
   const isSubstantial = ['weekly_review', 'monthly_retro', 'quarterly_planning'].includes(beat)
   const cafPrompt = composeMiloPrompt(isSubstantial ? 'chat' : 'nudge')
   const maxTokens = isSubstantial ? 1024 : 512
-  const client = new Anthropic()
-
-  const response = await client.messages.create({
-    model: process.env.MILO_CHAT_MODEL || 'claude-sonnet-4-20250514',
-    max_tokens: maxTokens,
+  // Through the Hydra LLM gateway (subscription lane, metered, breaker-aware).
+  // A skip returns '' and the caller logs SKIPPED instead of erroring.
+  return gatewayComplete('milo-heartbeat', context, {
+    task: 'write',
+    tier: 'mid',
+    maxTokens,
     system: `${cafPrompt}\n\nYou are sending a proactive message on Telegram. No emoji. Be Milo. Today is ${new Date().toISOString().split('T')[0]}.`,
-    messages: [{ role: 'user', content: context }],
   })
-
-  return response.content[0].type === 'text' ? response.content[0].text : ''
 }
 
 // ============================================================================
