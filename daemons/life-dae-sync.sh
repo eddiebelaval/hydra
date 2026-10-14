@@ -241,7 +241,7 @@ Keep it at the altitude of "how's the money part of life going?" not "how's the 
 Each value should be an array of short, factual observation strings (1-3 per section MAX).
 """
 
-synthesis = call_claude(prompt, api_key="${ANTHROPIC_API_KEY}")
+synthesis = call_claude(prompt, job="life-dae-sync")
 print(json.dumps(synthesis, indent=2))
 PYEOF
 )

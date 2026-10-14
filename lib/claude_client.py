@@ -7,49 +7,33 @@ Used by bridge daemons (dae-sync, ava-sync) for Haiku synthesis.
 Usage in heredoc:
     sys.path.insert(0, os.path.expanduser('~/.hydra/lib'))
     from claude_client import call_claude
-    result = call_claude(prompt, api_key="sk-...")
+    result = call_claude(prompt, job="life-dae-sync")
 """
 
 import json
-import re
-import urllib.request
-import urllib.error
 import os
+import re
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from hydra_llm import complete  # noqa: E402  (the Hydra LLM gateway)
 
 
-def call_claude(prompt, model="claude-haiku-4-5-20251001", max_tokens=1200, api_key=None):
-    """Call Claude API and return parsed JSON response.
+def call_claude(prompt, model="claude-haiku-4-5-20251001", max_tokens=1200, api_key=None, job=None):
+    """Call Claude through the Hydra LLM gateway and return parsed JSON.
 
-    Returns a dict on success, or {"error": "..."} on failure.
-    Automatically strips markdown fences from the response.
+    Returns a dict on success, or {"error": "..."} on failure or skip.
+    Automatically strips markdown fences from the response. `model` picks the
+    tier (opus/sonnet/haiku); `api_key` is ignored, the gateway owns credentials
+    (docs/LLM-GATEWAY.md).
     """
-    if api_key is None:
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-
-    data = json.dumps({
-        "model": model,
-        "max_tokens": max_tokens,
-        "messages": [{"role": "user", "content": prompt}]
-    }).encode()
-
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=data,
-        headers={
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json"
-        }
-    )
-
+    tier = "large" if "opus" in model else "mid" if "sonnet" in model else "small"
+    job = job or os.environ.get("HYDRA_LLM_JOB") or "claude_client"
     try:
-        with urllib.request.urlopen(req) as resp:
-            result = json.loads(resp.read())
-            text = result['content'][0]['text']
-            # Extract JSON from markdown fences if present
-            fence_match = re.search(r'```(?:json)?\s*\n(.*?)\n```', text, re.DOTALL)
-            if fence_match:
-                text = fence_match.group(1)
-            return json.loads(text)
-    except (urllib.error.URLError, json.JSONDecodeError, KeyError, IndexError) as e:
+        text = complete(job, prompt, task="extract", tier=tier, max_tokens=max_tokens)
+        fence_match = re.search(r'```(?:json)?\s*\n(.*?)\n```', text, re.DOTALL)
+        if fence_match:
+            text = fence_match.group(1)
+        return json.loads(text)
+    except Exception as e:
         return {"error": str(e)}

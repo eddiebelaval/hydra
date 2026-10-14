@@ -257,7 +257,7 @@ Only include sections where there's actual data. Skip empty sections.
 Be factual, not interpretive. Use Eddie's own words where possible.
 """
 
-synthesis = call_claude(prompt, max_tokens=1500, api_key="${ANTHROPIC_API_KEY}")
+synthesis = call_claude(prompt, max_tokens=1500, job="life-ava-sync")
 print(json.dumps(synthesis, indent=2))
 PYEOF
 )
