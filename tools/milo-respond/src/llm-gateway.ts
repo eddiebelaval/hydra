@@ -50,3 +50,21 @@ export function gatewayComplete(job: string, prompt: string, opts: GatewayOption
     throw err
   }
 }
+
+/**
+ * Drop-in for a single-turn `client.messages.create({...})` with no tools:
+ * same params in, an SDK-shaped `{ content: [{ type: 'text', text }] }` out,
+ * so callers keep their `response.content[0]` parsing. Chat with tools stays
+ * on the SDK (the subscription lane runs without tools).
+ */
+export function gatewayMessages(
+  job: string,
+  task: GatewayTask,
+  params: { model?: string; max_tokens?: number; system?: string; messages: Array<{ role: string; content: string }> },
+): { content: Array<{ type: 'text'; text: string }> } {
+  const model = params.model ?? ''
+  const tier: GatewayTier = model.includes('opus') ? 'large' : model.includes('sonnet') ? 'mid' : 'small'
+  const prompt = params.messages.map(m => m.content).join('\n\n')
+  const text = gatewayComplete(job, prompt, { system: params.system, task, tier, maxTokens: params.max_tokens })
+  return { content: [{ type: 'text', text }] }
+}

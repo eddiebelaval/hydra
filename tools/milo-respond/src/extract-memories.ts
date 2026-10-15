@@ -6,7 +6,7 @@
  * Extracts persistent memories and mood signals from the exchange.
  */
 
-import Anthropic from '@anthropic-ai/sdk'
+import { gatewayMessages } from './llm-gateway.js'
 import Database from 'better-sqlite3'
 import { findSupersessionTarget } from './supersede.js'
 
@@ -41,9 +41,8 @@ interface Extraction {
 }
 
 async function extract(userMessage: string, assistantMessage: string): Promise<Extraction> {
-  const client = new Anthropic()
 
-  const response = await client.messages.create({
+  const response = gatewayMessages('milo-extract-memories', 'extract', {
     model: process.env.MILO_EXTRACTION_MODEL || 'claude-haiku-4-5-20251001',
     max_tokens: 500,
     messages: [{

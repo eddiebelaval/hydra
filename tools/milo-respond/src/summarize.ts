@@ -6,7 +6,7 @@
  * Called when unsummarized turns exceed threshold.
  */
 
-import Anthropic from '@anthropic-ai/sdk'
+import { gatewayMessages } from './llm-gateway.js'
 import Database from 'better-sqlite3'
 
 const DB_PATH = process.env.HYDRA_DB || `${process.env.HOME}/.hydra/hydra.db`
@@ -41,7 +41,6 @@ async function main() {
     if (turns.length < BLOCK_SIZE) return
 
     // Summarize in blocks
-    const client = new Anthropic()
 
     for (let i = 0; i < turns.length; i += BLOCK_SIZE) {
       const block = turns.slice(i, i + BLOCK_SIZE)
@@ -51,7 +50,7 @@ async function main() {
         `${t.role === 'user' ? 'Eddie' : 'Milo'}: ${t.content.substring(0, 500)}`
       ).join('\n')
 
-      const response = await client.messages.create({
+      const response = gatewayMessages('milo-summarize', 'summarize', {
         model: process.env.MILO_EXTRACTION_MODEL || 'claude-haiku-4-5-20251001',
         max_tokens: 400,
         messages: [{

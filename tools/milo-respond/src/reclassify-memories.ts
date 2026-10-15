@@ -6,7 +6,7 @@
  * Usage: npx tsx src/reclassify-memories.ts [--dry-run]
  */
 
-import Anthropic from '@anthropic-ai/sdk'
+import { gatewayMessages } from './llm-gateway.js'
 import Database from 'better-sqlite3'
 
 const DB_PATH = process.env.HYDRA_DB || `${process.env.HOME}/.hydra/hydra.db`
@@ -19,11 +19,10 @@ const CATEGORIES = [
 ] as const
 
 async function reclassify(memories: Array<{ id: number; content: string; category: string }>): Promise<Array<{ id: number; category: string; domain: string | null }>> {
-  const client = new Anthropic()
 
   const memoryList = memories.map((m, i) => `${i}. [${m.category}] ${m.content}`).join('\n')
 
-  const response = await client.messages.create({
+  const response = gatewayMessages('milo-reclassify-memories', 'extract', {
     model: process.env.MILO_EXTRACTION_MODEL || 'claude-haiku-4-5-20251001',
     max_tokens: 2000,
     messages: [{
