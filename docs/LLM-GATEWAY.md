@@ -55,10 +55,15 @@ so batch jobs stay off-peak and the meter shows any crowding.
 
 | Phase | Work | Gate |
 |-------|------|------|
-| 1 | Gateway core, meter, breaker, budgets, bats tests | none (Claude) |
-| 1 | Move observer, reflector, brain-updater, ava-memory-compiler, journey-append onto it | none (Claude) |
-| 2 | Lexicon transcript ingest (`scripts/stream.ts`) onto a TS client of the same contract | Lexicon repo change, ships on tsc/vitest |
-| 2 | Milo heartbeat + extract-memories + summarize onto the gateway | none |
+| 1 | Gateway core, meter, breaker, budgets, bats tests | DONE 10/14 |
+| 1 | Move observer, reflector, brain-updater, ava-memory-compiler, journey-append onto it | DONE 10/14 |
+| 2 | Lexicon transcript ingest (`scripts/stream.ts`): `deriveText` routes through the gateway when `LEXICON_LLM_GATEWAY=1` (set by the local runner only; Vercel keeps the SDK) | DONE 10/15 |
+| 2 | Milo heartbeat, summarize, extract-memories, reclassify (`gatewayMessages` in llm-gateway.ts) | DONE 10/14-15 |
+| 2 | morning-planner, life-delta-engine, mara-poster, ava-memory-sync, telegram-ingest-kb, planning/review reply handlers, natural parser, both Telegram listeners (urllib drop-in: `hydra_llm.Request` / `hydra_llm.urlopen`) | DONE 10/15 |
+
+Still on the raw key, by design: Milo chat (`milo-respond/src/index.ts`, a tool
+loop the subscription lane cannot run), Ava's photo reader (images), and
+`hydra-heartbeat`'s API health ping (it measures the API itself).
 | 3 | SubQ lane wired from docs.subq.ai, shadow on hydra-router classifier for 2 weeks | Eddie: SubQ key in Keychain + ZDR form |
 | 4 | Collapse overlap: four Telegram front doors, six memory compressors | Eddie: review the merge map |
 | 5 | Retire every hard-coded model ID (grep gate in syntax-sentinel) | none |
