@@ -209,18 +209,11 @@ data = json.dumps({
     "messages": [{"role": "user", "content": prompt}]
 }).encode()
 
-req = urllib.request.Request(
-    "https://api.anthropic.com/v1/messages",
-    data=data,
-    headers={
-        "Content-Type": "application/json",
-        "x-api-key": api_key,
-        "anthropic-version": "2023-06-01"
-    }
-)
+import sys as _hs, os as _ho; _hs.path.insert(0, _ho.path.expanduser('~/.hydra/lib')); import hydra_llm
+req = hydra_llm.Request('mara-poster', data, task='extract')
 
 try:
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    with hydra_llm.urlopen(req, timeout=30) as resp:
         result = json.loads(resp.read())
         text = result["content"][0]["text"]
         # Try to parse as JSON (Sonnet might wrap in backticks)

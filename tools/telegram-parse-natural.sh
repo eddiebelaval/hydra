@@ -299,16 +299,9 @@ data = json.dumps({
 }).encode()
 
 try:
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01"
-        }
-    )
-    with urllib.request.urlopen(req, timeout=5) as resp:
+    import sys as _hs, os as _ho; _hs.path.insert(0, _ho.path.expanduser('~/.hydra/lib')); import hydra_llm
+    req = hydra_llm.Request('telegram-parse-natural', data, task='decide')
+    with hydra_llm.urlopen(req, timeout=5) as resp:
         result = json.loads(resp.read().decode())
         text = result.get("content", [{}])[0].get("text", "")
         print(text)

@@ -677,16 +677,9 @@ data = json.dumps({
 }).encode()
 
 try:
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01"
-        }
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    import sys as _hs, os as _ho; _hs.path.insert(0, _ho.path.expanduser('~/.hydra/lib')); import hydra_llm
+    req = hydra_llm.Request('ava-intro', data, task='chat')
+    with hydra_llm.urlopen(req, timeout=30) as resp:
         result = json.loads(resp.read().decode())
         print(result.get("content", [{}])[0].get("text", ""))
 except Exception as e:
@@ -953,16 +946,9 @@ data = json.dumps({
 }).encode()
 
 try:
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01"
-        }
-    )
-    with urllib.request.urlopen(req, timeout=10) as resp:
+    import sys as _hs, os as _ho; _hs.path.insert(0, _ho.path.expanduser('~/.hydra/lib')); import hydra_llm
+    req = hydra_llm.Request('ava-memory-extract', data, task='extract')
+    with hydra_llm.urlopen(req, timeout=10) as resp:
         result = json.loads(resp.read().decode())
         raw = result.get("content", [{}])[0].get("text", "{}")
         raw = raw.strip()
@@ -1112,16 +1098,9 @@ body = json.dumps({
     'messages': [{'role': 'user', 'content': 'Content type: relationship\n\n' + content}]
 }).encode()
 
-req = urllib.request.Request(
-    'https://api.anthropic.com/v1/messages',
-    data=body,
-    headers={
-        'x-api-key': api_key,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-    },
-)
-resp = urllib.request.urlopen(req, timeout=60)
+import sys as _hs, os as _ho; _hs.path.insert(0, _ho.path.expanduser('~/.hydra/lib')); import hydra_llm
+req = hydra_llm.Request('ava-relationship-extract', body, task='extract')
+resp = hydra_llm.urlopen(req, timeout=60)
 data = json.loads(resp.read())
 text = ''.join(b['text'] for b in data['content'] if b['type'] == 'text')
 # Strip code fences if present
@@ -1475,16 +1454,9 @@ data = json.dumps({
 }).encode()
 
 try:
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01"
-        }
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    import sys as _hs, os as _ho; _hs.path.insert(0, _ho.path.expanduser('~/.hydra/lib')); import hydra_llm
+    req = hydra_llm.Request('ava-chat', data, task='chat')
+    with hydra_llm.urlopen(req, timeout=30) as resp:
         result = json.loads(resp.read().decode())
         text = result.get("content", [{}])[0].get("text", "")
         print(text)
@@ -1865,16 +1837,9 @@ data = json.dumps({
 }).encode()
 
 try:
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01"
-        }
-    )
-    with urllib.request.urlopen(req, timeout=10) as resp:
+    import sys as _hs, os as _ho; _hs.path.insert(0, _ho.path.expanduser('~/.hydra/lib')); import hydra_llm
+    req = hydra_llm.Request('ava-reminder', data, task='extract')
+    with hydra_llm.urlopen(req, timeout=10) as resp:
         result = json.loads(resp.read().decode())
         raw = result.get("content", [{}])[0].get("text", "{}")
         raw = raw.strip()
@@ -2248,16 +2213,9 @@ data = json.dumps({
 }).encode()
 
 try:
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01"
-        }
-    )
-    with urllib.request.urlopen(req, timeout=10) as resp:
+    import sys as _hs, os as _ho; _hs.path.insert(0, _ho.path.expanduser('~/.hydra/lib')); import hydra_llm
+    req = hydra_llm.Request('ava-checkin', data, task='write')
+    with hydra_llm.urlopen(req, timeout=10) as resp:
         result = json.loads(resp.read().decode())
         text = result.get("content", [{}])[0].get("text", "").strip()
         # Strip quotes if Haiku wrapped it

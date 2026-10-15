@@ -292,16 +292,9 @@ if not api_key:
     exit(0)
 
 try:
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01"
-        }
-    )
-    resp = urllib.request.urlopen(req, timeout=30)
+    import sys as _hs, os as _ho; _hs.path.insert(0, _ho.path.expanduser('~/.hydra/lib')); import hydra_llm
+    req = hydra_llm.Request('telegram-ingest-kb', data, task='extract')
+    resp = hydra_llm.urlopen(req, timeout=30)
     result = json.loads(resp.read().decode())
     text = result["content"][0]["text"]
     json_match = re.search(r'\{[^{}]*\}', text, re.DOTALL)

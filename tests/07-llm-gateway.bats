@@ -97,3 +97,21 @@ print(e.kind, e.until.isoformat())"
     [ "$status" -eq 0 ]
     [[ "$output" == *"r1"* ]]
 }
+
+@test "urllib compat: old raw-API heredoc shape works unchanged through the gateway" {
+    export FAKE_MODE=ok
+    run python3 -c "
+import json, sys; sys.path.insert(0, '$HOME/.hydra/lib'); import hydra_llm
+data = json.dumps({'model': 'claude-sonnet-4-5-20250929', 'max_tokens': 50, 'system': 'be brief',
+                   'messages': [{'role': 'user', 'content': 'a'}, {'role': 'assistant', 'content': 'b'},
+                                {'role': 'user', 'content': [{'type': 'text', 'text': 'c'}]}]}).encode()
+req = hydra_llm.Request('compat-job', data, task='extract')
+assert req.tier == 'mid' and req.system == 'be brief', (req.tier, req.system)
+assert 'Eddie: a' in req.prompt and 'You: b' in req.prompt and req.prompt.endswith('c'), req.prompt
+with hydra_llm.urlopen(req, timeout=5) as resp:
+    print(json.loads(resp.read().decode())['content'][0]['text'])
+"
+    [ "$status" -eq 0 ]
+    [ "$output" = "hello from sub" ]
+    [ "$(rows "select job||':'||task||':'||tier||':'||lane from llm_calls")" = "compat-job:extract:mid:sub" ]
+}

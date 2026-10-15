@@ -296,17 +296,10 @@ data = json.dumps({
 max_retries = 2
 for attempt in range(max_retries + 1):
     try:
-        req = urllib.request.Request(
-            os.environ.get("API_URL", "https://api.anthropic.com/v1/messages"),
-            data=data,
-            headers={
-                "Content-Type": "application/json",
-                "x-api-key": api_key,
-                "anthropic-version": os.environ.get("API_VERSION", "2023-06-01")
-            }
-        )
+        import sys as _hs, os as _ho; _hs.path.insert(0, _ho.path.expanduser('~/.hydra/lib')); import hydra_llm
+        req = hydra_llm.Request('ava-memory-sync', data, task='extract')
         timeout = int(os.environ.get("API_TIMEOUT", "45"))
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with hydra_llm.urlopen(req, timeout=timeout) as resp:
             result = json.loads(resp.read().decode())
             if "error" in result:
                 print(f"API error: {result['error']}", file=sys.stderr)
@@ -526,17 +519,10 @@ data = json.dumps({
 }).encode()
 
 try:
-    req = urllib.request.Request(
-        os.environ.get("API_URL", "https://api.anthropic.com/v1/messages"),
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": os.environ.get("API_VERSION", "2023-06-01")
-        }
-    )
+    import sys as _hs, os as _ho; _hs.path.insert(0, _ho.path.expanduser('~/.hydra/lib')); import hydra_llm
+    req = hydra_llm.Request('ava-memory-sync', data, task='extract')
     timeout = int(os.environ.get("API_TIMEOUT", "30"))
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with hydra_llm.urlopen(req, timeout=timeout) as resp:
         result = json.loads(resp.read().decode())
         if "error" in result:
             print(f"API error: {result['error']}", file=sys.stderr)

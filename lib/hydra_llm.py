@@ -361,6 +361,59 @@ def complete(job: str, prompt: str, system: str | None = None, task: str = "summ
     raise Skipped("; ".join(skipped) or "no lane configured")
 
 
+# ------------------------------------------------------------ urllib compat
+# Drop-in for the old raw-API heredocs: swap `urllib.request.Request(URL, ...)`
+# for `hydra_llm.Request(job, data, task=...)` and `urllib.request.urlopen`
+# for `hydra_llm.urlopen`; the rest of the caller (resp.read(), parsing
+# result["content"][0]["text"]) stays as written.
+
+def _text_of(content) -> str:
+    if isinstance(content, str):
+        return content
+    return "\n".join(b.get("text", "") for b in content or [] if isinstance(b, dict) and b.get("type") == "text")
+
+
+class Request(object):
+    def __init__(self, job, data, task="summarize", tier=None, **_ignored):
+        payload = json.loads(data.decode() if isinstance(data, (bytes, bytearray)) else data)
+        model = payload.get("model", "")
+        self.job = job
+        self.task = task
+        self.tier = tier or ("large" if "opus" in model else "mid" if "sonnet" in model else "small")
+        self.max_tokens = int(payload.get("max_tokens") or 1000)
+        self.system = _text_of(payload.get("system")) or None
+        msgs = payload.get("messages") or []
+        if len(msgs) <= 1:
+            self.prompt = _text_of(msgs[0].get("content")) if msgs else ""
+        else:
+            history = "\n\n".join(("Eddie" if m.get("role") == "user" else "You") + ": " + _text_of(m.get("content"))
+                                  for m in msgs[:-1])
+            self.prompt = ("Conversation so far:\n\n" + history
+                           + "\n\nReply to this latest message:\n\n" + _text_of(msgs[-1].get("content")))
+
+
+class _Response(object):
+    def __init__(self, body: bytes):
+        self._body = body
+
+    def read(self) -> bytes:
+        return self._body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def urlopen(req: Request, timeout: int = 0, **_ignored) -> _Response:
+    """Old raw-API callers used 5-60 s timeouts; the sub lane needs more."""
+    text = complete(req.job, req.prompt, system=req.system, task=req.task, tier=req.tier,
+                    max_tokens=req.max_tokens, timeout=max(int(timeout or 0), 120))
+    return _Response(json.dumps({"type": "message", "role": "assistant",
+                                 "content": [{"type": "text", "text": text}]}).encode())
+
+
 # ----------------------------------------------------------------------- cli
 
 def _report(days: int) -> None:
