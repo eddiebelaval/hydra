@@ -292,7 +292,7 @@ User: asdfghjk
 {"type": "unknown", "args": [], "confidence": "high"}"""
 
 data = json.dumps({
-    "model": "claude-haiku-4-5-20251001",
+    "model": "haiku",
     "max_tokens": 100,
     "system": system_prompt,
     "messages": [{"role": "user", "content": message}]

@@ -12,6 +12,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { saveMemory } from './hydra-memory-db.js'
 import type { HydraMemoryCategory } from './hydra-memory-db.js'
+import { modelFor } from './llm-models.js'
 
 const TRIVIAL = /^(ok|yes|no|thanks|cool|got it|sure|yep|nah|k|lol|haha|nice)$/i
 
@@ -50,7 +51,7 @@ async function extract(
   const client = new Anthropic()
 
   const response = await client.messages.create({
-    model: process.env.HYDRA_EXTRACTION_MODEL || 'claude-haiku-4-5-20251001',
+    model: process.env.HYDRA_EXTRACTION_MODEL || modelFor('small'),
     max_tokens: 300,
     messages: [{
       role: 'user',

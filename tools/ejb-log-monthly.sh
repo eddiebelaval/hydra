@@ -99,7 +99,7 @@ PROMPT="$(mktemp)"
   cat "$FACTS"
 } > "$PROMPT"
 DRAFT="$(mktemp)"
-"$CLAUDE_BIN" -p --model claude-opus-5-5 --output-format text < "$PROMPT" > "$DRAFT" 2>>"$LOG_FILE"
+"$CLAUDE_BIN" -p --model "$("$HOME/.hydra/bin/hydra-llm" model large --lane sub)" --output-format text < "$PROMPT" > "$DRAFT" 2>>"$LOG_FILE"
 # keep only the frontmatter block, in case anything leaked around it
 python3 - "$DRAFT" <<'PY'
 import re, sys

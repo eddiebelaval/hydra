@@ -698,7 +698,7 @@ if os.environ.get("HYDRA_LOCKIN_FRESH") == "1":
     )
 
 data = json.dumps({
-    "model": "claude-sonnet-4-5-20250929",
+    "model": "sonnet",
     "max_tokens": 1024,
     "system": system,
     "messages": [{"role": "user", "content": question}]

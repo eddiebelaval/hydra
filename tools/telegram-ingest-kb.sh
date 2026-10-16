@@ -278,7 +278,7 @@ system_prompt = (
 user_msg = f"Source type: {source_type}\nURL: {url}\nTitle: {title}\nKB override: {kb_override}\n\nContent preview:\n{content[:1500]}"
 
 data = json.dumps({
-    "model": "claude-haiku-4-5-20251001",
+    "model": "haiku",
     "max_tokens": 300,
     "system": system_prompt,
     "messages": [{"role": "user", "content": user_msg}]

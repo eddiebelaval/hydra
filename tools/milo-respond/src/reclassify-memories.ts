@@ -23,7 +23,7 @@ async function reclassify(memories: Array<{ id: number; content: string; categor
   const memoryList = memories.map((m, i) => `${i}. [${m.category}] ${m.content}`).join('\n')
 
   const response = gatewayMessages('milo-reclassify-memories', 'extract', {
-    model: process.env.MILO_EXTRACTION_MODEL || 'claude-haiku-4-5-20251001',
+    model: process.env.MILO_EXTRACTION_MODEL || 'haiku',
     max_tokens: 2000,
     messages: [{
       role: 'user',

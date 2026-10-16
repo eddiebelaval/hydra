@@ -51,7 +51,7 @@ async function main() {
       ).join('\n')
 
       const response = gatewayMessages('milo-summarize', 'summarize', {
-        model: process.env.MILO_EXTRACTION_MODEL || 'claude-haiku-4-5-20251001',
+        model: process.env.MILO_EXTRACTION_MODEL || 'haiku',
         max_tokens: 400,
         messages: [{
           role: 'user',

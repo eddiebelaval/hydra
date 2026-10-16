@@ -453,7 +453,7 @@ run_claude() {
 
     run_with_timeout "$ENGINE_TIMEOUT" "$output_file" \
         bash -c "cd \"$AVA_WORKTREE\" && CLAUDECODE= \"$CLAUDE_CLI\" -p \
-            --model claude-opus-4-6 \
+            --model $("$HOME/.hydra/bin/hydra-llm" model large --lane sub) \
             --allowedTools 'Edit,Write,Read,Bash,Glob,Grep' \
             --dangerously-skip-permissions \
             < \"$prompt_file\""
@@ -462,7 +462,7 @@ run_claude() {
     rm -f "$prompt_file"
 
     LAST_ENGINE_ELAPSED=$(( $(date +%s) - start_time ))
-    LAST_ENGINE_MODEL="claude-opus-4-6"
+    LAST_ENGINE_MODEL="$("$HOME/.hydra/bin/hydra-llm" model large --lane sub)"
     log "Claude engine finished in ${LAST_ENGINE_ELAPSED}s (exit: $exit_code)"
 
     if [[ $exit_code -eq 124 ]]; then

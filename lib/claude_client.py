@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from hydra_llm import complete  # noqa: E402  (the Hydra LLM gateway)
 
 
-def call_claude(prompt, model="claude-haiku-4-5-20251001", max_tokens=1200, api_key=None, job=None):
+def call_claude(prompt, model="haiku", max_tokens=1200, api_key=None, job=None):
     """Call Claude through the Hydra LLM gateway and return parsed JSON.
 
     Returns a dict on success, or {"error": "..."} on failure or skip.

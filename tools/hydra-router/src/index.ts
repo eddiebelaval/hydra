@@ -24,10 +24,11 @@ import { executeHydraTool, setCurrentSession } from './hydra-tool-executor.js'
 import { loadHydraContext, formatHydraContextForPrompt, getRecentUserMessages } from './hydra-context.js'
 import { saveTurn } from './hydra-memory-db.js'
 import type { EntityId } from './types.js'
+import { modelFor } from './llm-models.js'
 
 const HYDRA_ROOT = process.env.HYDRA_ROOT || `${process.env.HOME}/.hydra`
 const MILO_RESPOND_PATH = path.join(HYDRA_ROOT, 'tools/milo-respond')
-const HYDRA_CHAT_MODEL = process.env.HYDRA_CHAT_MODEL || 'claude-sonnet-5'
+const HYDRA_CHAT_MODEL = process.env.HYDRA_CHAT_MODEL || modelFor('mid')
 
 // -- Parse CLI args --
 

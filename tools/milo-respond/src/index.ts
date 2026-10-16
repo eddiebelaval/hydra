@@ -14,6 +14,7 @@ import { composeMiloPrompt } from './caf-loader.js'
 import { loadContext, formatContextForPrompt, saveTurn } from './context.js'
 import { ALL_TOOLS } from './tools.js'
 import { executeTool } from './tool-executor.js'
+import { modelFor } from './llm-gateway.js'
 
 // -- Parse CLI args --
 
@@ -123,7 +124,7 @@ async function main() {
     loopCount++
 
     const response = await client.messages.create({
-      model: process.env.MILO_CHAT_MODEL || 'claude-sonnet-5',
+      model: process.env.MILO_CHAT_MODEL || modelFor('mid'),
       max_tokens: 2048,
       system: systemPrompt,
       messages: currentMessages,

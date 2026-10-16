@@ -497,8 +497,11 @@ messages = [{
     ]
 }]
 
+sys.path.insert(0, os.path.expanduser("~/.hydra/lib"))
+from hydra_llm import model_for
+
 data = json.dumps({
-    "model": "claude-sonnet-4-5-20250929",
+    "model": model_for("mid"),
     "max_tokens": 500,
     "system": system,
     "messages": messages
@@ -670,7 +673,7 @@ system = os.environ.get("AVA_INTRO_SYSTEM", "")
 message = os.environ.get("AVA_INTRO_MESSAGE", "")
 
 data = json.dumps({
-    "model": "claude-sonnet-4-5-20250929",
+    "model": "sonnet",
     "max_tokens": 800,
     "system": system,
     "messages": [{"role": "user", "content": message}]
@@ -940,7 +943,7 @@ Rules for memories:
 Return ONLY the JSON object."""
 
 data = json.dumps({
-    "model": "claude-haiku-4-5-20251001",
+    "model": "haiku",
     "max_tokens": 500,
     "messages": [{"role": "user", "content": prompt}]
 }).encode()
@@ -1092,7 +1095,7 @@ prompt = sys.argv[2]
 api_key = sys.argv[3]
 
 body = json.dumps({
-    'model': 'claude-sonnet-4-5-20250929',
+    'model': 'sonnet',
     'max_tokens': 4000,
     'system': prompt,
     'messages': [{'role': 'user', 'content': 'Content type: relationship\n\n' + content}]
@@ -1447,7 +1450,7 @@ messages = list(history[-30:])  # Last 15 exchanges (30 messages)
 messages.append({"role": "user", "content": user_message})
 
 data = json.dumps({
-    "model": "claude-haiku-4-5-20251001",
+    "model": "haiku",
     "max_tokens": 1024,
     "system": system_prompt,
     "messages": messages
@@ -1831,7 +1834,7 @@ Return JSON with:
 Return ONLY the JSON object."""
 
 data = json.dumps({
-    "model": "claude-haiku-4-5-20251001",
+    "model": "haiku",
     "max_tokens": 200,
     "messages": [{"role": "user", "content": prompt}]
 }).encode()
@@ -2207,7 +2210,7 @@ Write ONE short message (1-2 sentences). Rules:
 Return ONLY the message text, nothing else."""
 
 data = json.dumps({
-    "model": "claude-haiku-4-5-20251001",
+    "model": "haiku",
     "max_tokens": 100,
     "messages": [{"role": "user", "content": prompt}]
 }).encode()

@@ -9,6 +9,7 @@
  * budget, exit 75): callers treat that the same as "nothing to send".
  */
 import { execFileSync } from 'child_process'
+import { readFileSync } from 'fs'
 import os from 'os'
 import path from 'path'
 
@@ -24,6 +25,15 @@ export interface GatewayOptions {
 }
 
 const HYDRA_ROOT = process.env.HYDRA_ROOT || path.join(os.homedir(), '.hydra')
+
+/**
+ * The model ID config/llm.json maps a tier to, for the callers that must reach
+ * a model themselves (the chat tool loops). Everyone else uses gatewayComplete.
+ */
+export function modelFor(tier: GatewayTier = 'small', lane: 'api' | 'sub' = 'api'): string {
+  const cfg = JSON.parse(readFileSync(path.join(HYDRA_ROOT, 'config', 'llm.json'), 'utf8'))
+  return (cfg.tiers[tier] ?? cfg.tiers.small)[lane]
+}
 
 export function gatewayComplete(job: string, prompt: string, opts: GatewayOptions = {}): string {
   const timeoutSec = opts.timeoutSec ?? 180

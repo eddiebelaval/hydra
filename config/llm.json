@@ -1,9 +1,9 @@
 {
   "_doc": "Hydra LLM gateway config. See ~/.hydra/docs/LLM-GATEWAY.md. Jobs name a task + tier; this file maps them to lanes and models.",
   "tiers": {
-    "small": {"sub": "haiku", "api": "claude-haiku-4-5-20251001"},
-    "mid":   {"sub": "sonnet", "api": "claude-sonnet-5"},
-    "large": {"sub": "opus", "api": "claude-opus-5-5"}
+    "small": {"sub": "claude-haiku-4-5-20251001", "api": "claude-haiku-4-5-20251001"},
+    "mid":   {"sub": "claude-sonnet-5", "api": "claude-sonnet-5"},
+    "large": {"sub": "claude-opus-5-5", "api": "claude-opus-5-5"}
   },
   "tasks": {
     "decide":    ["subq", "sub", "api"],

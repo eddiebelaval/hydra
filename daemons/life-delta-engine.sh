@@ -209,7 +209,7 @@ if not api_key:
 prompt = """$DELTA_PROMPT"""
 
 data = json.dumps({
-    "model": "claude-sonnet-4-20250514",
+    "model": "sonnet",
     "max_tokens": 1000,
     "messages": [{"role": "user", "content": prompt}]
 }).encode()

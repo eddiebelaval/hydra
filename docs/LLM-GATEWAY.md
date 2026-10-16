@@ -61,12 +61,27 @@ so batch jobs stay off-peak and the meter shows any crowding.
 | 2 | Milo heartbeat, summarize, extract-memories, reclassify (`gatewayMessages` in llm-gateway.ts) | DONE 10/14-15 |
 | 2 | morning-planner, life-delta-engine, mara-poster, ava-memory-sync, telegram-ingest-kb, planning/review reply handlers, natural parser, both Telegram listeners (urllib drop-in: `hydra_llm.Request` / `hydra_llm.urlopen`) | DONE 10/15 |
 
-Still on the raw key, by design: Milo chat (`milo-respond/src/index.ts`, a tool
-loop the subscription lane cannot run), Ava's photo reader (images), and
-`hydra-heartbeat`'s API health ping (it measures the API itself).
 | 3 | SubQ lane wired from docs.subq.ai, shadow on hydra-router classifier for 2 weeks | Eddie: SubQ key in Keychain + ZDR form |
 | 4 | Collapse overlap: four Telegram front doors, six memory compressors | Eddie: review the merge map |
-| 5 | Retire every hard-coded model ID (grep gate in syntax-sentinel) | none |
+| 5 | Retire every hard-coded model ID: `config/llm.json` is the only place one lives; gate = `hydra-llm lint-models` (bats test 11) | DONE 10/16 |
+
+Still on the raw key, by design: Milo chat and hydra-router chat (tool loops
+the subscription lane cannot run), the router's classifier (SubQ phase-3
+shadow target), Ava's photo reader (images), and `hydra-heartbeat`'s API
+health ping (it measures the API itself).
+
+## Picking a model (phase 5)
+
+No Hydra code names a model ID. Gateway callers name a tier; an old
+urllib payload's `"model"` field may say `haiku` / `sonnet` / `opus`, which
+only picks the tier. Callers that must reach a model themselves resolve it:
+
+- shell: `"$("$HOME/.hydra/bin/hydra-llm" model mid --lane sub)"`
+- Python: `from hydra_llm import model_for; model_for("mid")`
+- TS: `modelFor('mid')` (milo-respond `llm-gateway.ts`, hydra-router `llm-models.ts`)
+
+Both lanes are pinned to exact IDs (an unattended 3am job must not float onto
+a new model through an alias). Upgrading a tier is one edit in `config/llm.json`.
 
 ## Eddie's gates
 

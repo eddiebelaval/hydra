@@ -115,3 +115,16 @@ with hydra_llm.urlopen(req, timeout=5) as resp:
     [ "$output" = "hello from sub" ]
     [ "$(rows "select job||':'||task||':'||tier||':'||lane from llm_calls")" = "compat-job:extract:mid:sub" ]
 }
+
+@test "model resolver reads the tier map; unknown tier falls back to small" {
+    run_gw model mid
+    [ "$status" -eq 0 ]
+    [ "$output" = "$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["tiers"]["mid"]["api"])' "$HYDRA_LLM_CONFIG")" ]
+    run_gw model nope --lane sub
+    [ "$output" = "$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["tiers"]["small"]["sub"])' "$HYDRA_LLM_CONFIG")" ]
+}
+
+@test "phase 5 gate: no hard-coded model ID in Hydra code outside config/llm.json" {
+    run_gw lint-models
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+}

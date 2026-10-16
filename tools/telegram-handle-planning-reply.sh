@@ -65,7 +65,7 @@ If fewer than 3 are mentioned, keep what's there and add "[unset]" for missing o
 Example output: ["Ship parallax demo", "Review Rune PR #1", "Homer auth system"]"""
 
 data = json.dumps({
-    "model": "claude-haiku-4-5-20251001",
+    "model": "haiku",
     "max_tokens": 150,
     "messages": [{"role": "user", "content": prompt}]
 }).encode()

@@ -78,7 +78,7 @@ execute_claude_local() {
 
     local model_flag=""
     if [[ -n "$AGENT_MODEL" ]] && [[ "$AGENT_MODEL" != *"synthetic"* ]]; then
-        # Extract model name from format like 'anthropic/claude-sonnet-4-20250514'
+        # Extract model name from format like 'anthropic/<model-id>'
         local model_name="${AGENT_MODEL##*/}"
         model_flag="--model $model_name"
     fi

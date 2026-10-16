@@ -17,8 +17,9 @@ import {
   updateRoutingSession,
 } from './routing-session.js'
 import type { EntityId, RouteDecision, ClassificationResponse, RoutingSession } from './types.js'
+import { modelFor } from './llm-models.js'
 
-const CLASSIFICATION_MODEL = process.env.HYDRA_CLASSIFICATION_MODEL || 'claude-haiku-4-5-20251001'
+const CLASSIFICATION_MODEL = process.env.HYDRA_CLASSIFICATION_MODEL || modelFor('small')
 const CONFIDENCE_THRESHOLD = 0.7
 
 // -- Stage 1: Keyword/Pattern Matching --

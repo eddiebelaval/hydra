@@ -71,6 +71,30 @@ def _cfg() -> dict:
         return json.load(f)
 
 
+def model_for(tier: str = "small", lane: str = "api") -> str:
+    """The model ID config/llm.json maps a tier to, for the few callers that must
+    reach a model themselves (tool loops, images, the API health ping, `claude -p`
+    jobs that need tools). Everyone else calls complete() and never sees an ID."""
+    tiers = _cfg()["tiers"]
+    return (tiers.get(tier) or tiers["small"])[lane]
+
+
+MODEL_ID_RE = r"claude-(haiku|sonnet|opus|fable)-[0-9]"
+
+
+def lint_models(root: str | None = None) -> list:
+    """Every hard-coded Claude model ID in Hydra's runnable code, as 'path:line: text'.
+    config/llm.json is the one place a model ID may live (phase 5 gate)."""
+    import re, subprocess
+    root = root or HYDRA_ROOT
+    out = subprocess.run(
+        ["git", "-C", root, "grep", "-nE", MODEL_ID_RE, "--", "daemons", "tools", "lib", "bin", "scripts",
+         ":!*.md", ":!*.json", ":!*.jsonl", ":!*node_modules*", ":!*/tests/*", ":!*.test.ts"],
+        capture_output=True, text=True).stdout
+    code = lambda l: l.split(":", 2)[2].lstrip() if l.count(":") >= 2 else l
+    return [l for l in out.splitlines() if l.strip() and not code(l).startswith(("#", "//", "*"))]
+
+
 # --------------------------------------------------------------------- meter
 
 SCHEMA = """CREATE TABLE IF NOT EXISTS llm_calls (
@@ -448,6 +472,18 @@ def main(argv: list) -> int:
             _save_breaker(state)
         print(json.dumps({k: v for k, v in state.items() if not k.startswith("budget:")}, indent=1))
         return 0
+    if argv[:1] == ["model"]:
+        ap = argparse.ArgumentParser(prog="hydra-llm model")
+        ap.add_argument("tier", nargs="?", default="small")
+        ap.add_argument("--lane", default="api")
+        a = ap.parse_args(argv[1:])
+        print(model_for(a.tier, a.lane))
+        return 0
+    if argv[:1] == ["lint-models"]:
+        hits = lint_models()
+        for h in hits:
+            print(h)
+        return 1 if hits else 0
     ap = argparse.ArgumentParser(prog="hydra-llm", description="Hydra LLM gateway; prompt on stdin")
     ap.add_argument("--job", required=True)
     ap.add_argument("--task", default="summarize")

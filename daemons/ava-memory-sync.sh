@@ -29,7 +29,7 @@ HYDRA_DB="$HYDRA_ROOT/hydra.db"
 STATE_DIR="$HYDRA_ROOT/state"
 CONFIG_FILE="$HYDRA_ROOT/config/ava-sync.env"
 SNAPSHOT_FILE="$STATE_DIR/solo-memory-snapshot.json"
-HAIKU_MODEL="claude-haiku-4-5-20251001"
+HAIKU_MODEL="haiku"  # tier for the gateway; config/llm.json holds the ID
 API_URL="https://api.anthropic.com/v1/messages"
 API_VERSION="2023-06-01"
 API_TIMEOUT=30
@@ -288,7 +288,7 @@ Rules:
 - Keep the total response compact — summarize, don't accumulate verbatim"""
 
 data = json.dumps({
-    "model": os.environ.get("HAIKU_MODEL", "claude-haiku-4-5-20251001"),
+    "model": os.environ.get("HAIKU_MODEL", "haiku"),
     "max_tokens": 4000,
     "messages": [{"role": "user", "content": prompt}]
 }).encode()
@@ -513,7 +513,7 @@ Rules:
 - Return ONLY valid JSON array, no markdown fences"""
 
 data = json.dumps({
-    "model": os.environ.get("HAIKU_MODEL", "claude-haiku-4-5-20251001"),
+    "model": os.environ.get("HAIKU_MODEL", "haiku"),
     "max_tokens": 1500,
     "messages": [{"role": "user", "content": prompt}]
 }).encode()

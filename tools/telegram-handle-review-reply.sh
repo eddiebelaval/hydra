@@ -76,7 +76,7 @@ Respond with ONLY a JSON array of 3 objects: [{{"number": 1, "status": "done", "
 If a priority isn't mentioned, keep it as "pending" with no notes."""
 
 data = json.dumps({
-    "model": "claude-haiku-4-5-20251001",
+    "model": "haiku",
     "max_tokens": 200,
     "messages": [{"role": "user", "content": prompt}]
 }).encode()

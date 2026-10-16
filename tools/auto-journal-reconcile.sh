@@ -140,7 +140,7 @@ print("\n".join(feed))
 PY
 
 # Run claude -p, write the wrapped JSON response
-"$CLAUDE_BIN" -p --model claude-sonnet-5 --output-format json < "$PROMPT_FILE" > "$PLAN_FILE" 2>>"$LOG_FILE"
+"$CLAUDE_BIN" -p --model "$("$HOME/.hydra/bin/hydra-llm" model mid --lane sub)" --output-format json < "$PROMPT_FILE" > "$PLAN_FILE" 2>>"$LOG_FILE"
 
 if [[ ! -s "$PLAN_FILE" ]]; then
     log "ERROR: claude returned empty; restoring queue"

@@ -230,7 +230,7 @@ MISSION CONTROL SIGNALS (active alerts/observations across portfolio):
 Respond with exactly 3 numbered suggestions, one per line. Keep each under 60 chars. No preamble."""
 
 data = json.dumps({
-    "model": "claude-haiku-4-5-20251001",
+    "model": "haiku",
     "max_tokens": 200,
     "messages": [{"role": "user", "content": prompt}]
 }).encode()

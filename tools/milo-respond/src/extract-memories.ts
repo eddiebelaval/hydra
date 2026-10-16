@@ -43,7 +43,7 @@ interface Extraction {
 async function extract(userMessage: string, assistantMessage: string): Promise<Extraction> {
 
   const response = gatewayMessages('milo-extract-memories', 'extract', {
-    model: process.env.MILO_EXTRACTION_MODEL || 'claude-haiku-4-5-20251001',
+    model: process.env.MILO_EXTRACTION_MODEL || 'haiku',
     max_tokens: 500,
     messages: [{
       role: 'user',

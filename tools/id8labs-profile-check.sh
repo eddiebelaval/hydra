@@ -22,7 +22,7 @@ PREV="$(cut -d' ' -f1 "$STATUS_FILE" 2>/dev/null || echo UNKNOWN)"
 
 # Probe: a trivial prompt on the id8labs profile only. Never inherit an API key
 # (that would bill metered) and never let the default profile answer for it.
-RESP="$(printf 'Reply with exactly: ok' | CLAUDE_CONFIG_DIR="$CFG" ANTHROPIC_API_KEY= claude -p --model claude-sonnet-5 2>>"$LOG" || true)"
+RESP="$(printf 'Reply with exactly: ok' | CLAUDE_CONFIG_DIR="$CFG" ANTHROPIC_API_KEY= claude -p --model "$("$HOME/.hydra/bin/hydra-llm" model mid --lane sub)" 2>>"$LOG" || true)"
 
 if printf '%s' "$RESP" | grep -qiE '^[[:space:]]*ok' \
    && ! printf '%s' "$RESP" | grep -qiE 'login expired|profile login|/login|not authenticated|invalid api key'; then

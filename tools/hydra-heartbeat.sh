@@ -269,11 +269,13 @@ check_api() {
 
     # Minimal Haiku ping — cheapest possible API call (~$0.0001)
     local api_result=$(python3 << 'PYEOF'
-import json, urllib.request, os
+import json, urllib.request, os, sys
+sys.path.insert(0, os.path.expanduser("~/.hydra/lib"))
+from hydra_llm import model_for
 
 api_key = os.environ.get("ANTHROPIC_API_KEY", "")
 data = json.dumps({
-    "model": "claude-haiku-4-5-20251001",
+    "model": model_for("small"),
     "max_tokens": 5,
     "messages": [{"role": "user", "content": "say ok"}]
 }).encode()

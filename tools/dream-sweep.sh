@@ -237,7 +237,7 @@ done)"
   echo " aligned day needs no sermon.>"
 } > "$PROMPT_FILE"
 
-MODEL="claude-sonnet-5"
+MODEL="$("$HOME/.hydra/bin/hydra-llm" model mid --lane sub)"
 
 # Billing: PREFER the id8labs subscription profile (like the other cognitive jobs),
 # but FALL BACK to the default profile if the id8labs login has expired -- the dream

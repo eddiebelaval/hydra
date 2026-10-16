@@ -204,7 +204,7 @@ if not api_key:
 prompt = """$ASSESS_PROMPT"""
 
 data = json.dumps({
-    "model": "claude-sonnet-4-20250514",
+    "model": "sonnet",
     "max_tokens": 500,
     "messages": [{"role": "user", "content": prompt}]
 }).encode()
