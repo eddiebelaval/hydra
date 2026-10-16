@@ -1,0 +1,29 @@
+#!/bin/bash
+# id8-token - store the id8labs long-lived Claude token (from `claude setup-token`)
+# in Keychain, straight from the clipboard. Strips the line break a wrapped
+# terminal copy adds, refuses anything that is not a token, then proves it signs
+# in on its own and removes it again if it does not. Never prints the token.
+# Read by: lib/hydra_llm.py, ~/.claude/id8labs-sub.env, tools/id8labs-profile-check.sh
+set -uo pipefail
+SERVICE="claude-id8labs-oauth-token"
+
+TOKEN="$(pbpaste | tr -d '[:space:]')"
+case "$TOKEN" in
+    sk-ant-oat01-*) ;;
+    *) echo "The clipboard does not hold a token (it should start with sk-ant-oat01-). Copy the token line from the setup-token output, then run id8-token again. Nothing stored."; exit 1 ;;
+esac
+
+security add-generic-password -U -a hydra -s "$SERVICE" -w "$TOKEN" || { echo "Keychain write failed. Nothing stored."; exit 1; }
+
+S="$(mktemp -d)"
+RESP="$(printf 'Reply with exactly: ok' | CLAUDE_CONFIG_DIR="$S" CLAUDE_CODE_OAUTH_TOKEN="$TOKEN" ANTHROPIC_API_KEY='' claude -p --model "$("$HOME/.hydra/bin/hydra-llm" model small --lane sub)" 2>&1)"
+rm -rf "$S"
+unset TOKEN
+
+if printf '%s' "$RESP" | grep -qiE '^[[:space:]]*ok'; then
+    echo "Stored and verified: the token signs in on its own. Hydra uses it from the next call."
+    exit 0
+fi
+security delete-generic-password -a hydra -s "$SERVICE" >/dev/null 2>&1
+echo "The token did not sign in ($(printf '%s' "$RESP" | head -1 | cut -c1-80)). Removed it again; Hydra stays on the browser login."
+exit 1

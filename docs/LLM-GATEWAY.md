@@ -88,7 +88,8 @@ a new model through an alias). Upgrading a tier is one edit in `config/llm.json`
 1. id8labs subscription login. DONE 10/16 (eb@id8labs.tech, Max). The browser
    login expires; to end re-logins, mint a long-lived token once:
    `CLAUDE_CONFIG_DIR=~/.claude-id8labs claude setup-token`, sign in as
-   id8labs, copy the token it prints, then
+   id8labs, copy the token it prints, then TYPE `~/.hydra/bin/id8-token`
+   (validates, strips the wrap line break, stores, proves it; DONE 10/16). Manual equivalent:
    `security add-generic-password -U -a hydra -s claude-id8labs-oauth-token -w "$(pbpaste)"`.
    The gateway, `id8labs-sub.env` and the 2-hourly probe all read it from
    Keychain. While the profile is expired the probe alerts once a day.
