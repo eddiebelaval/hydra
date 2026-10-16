@@ -233,12 +233,28 @@ def _price(model: str, inp: int, out: int) -> float:
     return 0.0
 
 
+SUB_TOKEN_SERVICE = "claude-id8labs-oauth-token"
+
+
+def _sub_token() -> str:
+    """The id8labs long-lived OAuth token from Keychain, or '' (then the config
+    dir's browser login is used). Read in-process, never printed."""
+    if "HYDRA_LLM_SUB_TOKEN" in os.environ:
+        return os.environ["HYDRA_LLM_SUB_TOKEN"]
+    try:
+        return subprocess.run(["security", "find-generic-password", "-a", "hydra", "-s", SUB_TOKEN_SERVICE, "-w"],
+                              capture_output=True, text=True, timeout=10).stdout.strip()
+    except Exception:
+        return ""
+
+
 def _lane_sub(model: str, prompt: str, system: str | None, max_tokens: int, timeout: int):
     claude = os.environ.get("HYDRA_LLM_CLAUDE_BIN") or shutil.which("claude") or os.path.expanduser("~/.local/bin/claude")
     if not os.path.exists(claude):
         raise LaneError(f"claude CLI not found ({claude})", "unavailable")
     env = dict(os.environ)
     env.pop("ANTHROPIC_API_KEY", None)  # an inherited key would silently bill metered
+    env.pop("CLAUDE_CODE_OAUTH_TOKEN", None)
     expired = False
     try:
         expired = open(SUB_STATUS).read().strip().upper().startswith("EXPIRED")
@@ -251,6 +267,9 @@ def _lane_sub(model: str, prompt: str, system: str | None, max_tokens: int, time
                   file=sys.stderr)
     else:
         env["CLAUDE_CONFIG_DIR"] = SUB_CONFIG_DIR
+        token = _sub_token()
+        if token:  # long-lived `claude setup-token` login: does not expire like the browser one
+            env["CLAUDE_CODE_OAUTH_TOKEN"] = token
     cmd = [claude, "-p", "--model", model, "--output-format", "json", "--tools", "",
            "--strict-mcp-config", "--setting-sources", "", "--no-session-persistence"]
     if system:

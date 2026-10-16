@@ -8,13 +8,14 @@ setup() {
     GW="$HOME/.hydra/lib/hydra_llm.py"
     export HYDRA_DB="$T/hydra.db" HYDRA_LLM_BREAKER="$T/breaker.json" HYDRA_LLM_NO_ALERT=1
     export HYDRA_LLM_API_URL="http://127.0.0.1:9/v1/messages" HYDRA_LLM_API_KEY="test-not-a-key"
-    export HYDRA_LLM_CLAUDE_BIN="$T/claude" HYDRA_LLM_SUB_STATUS="$T/no-status"
+    export HYDRA_LLM_CLAUDE_BIN="$T/claude" HYDRA_LLM_SUB_STATUS="$T/no-status" HYDRA_LLM_SUB_TOKEN=""
     sed 's/"calls_per_day": 200/"calls_per_day": 3/' "$HOME/.hydra/config/llm.json" > "$T/llm.json"
     export HYDRA_LLM_CONFIG="$T/llm.json"
     cat > "$T/claude" <<'FAKE'
 #!/bin/bash
 cat > /dev/null
 [ -n "$ANTHROPIC_API_KEY" ] && { echo '{"is_error":true,"result":"LEAKED API KEY"}'; exit 0; }
+[ "$FAKE_MODE" = token ] && { echo "{\"is_error\":false,\"result\":\"tok=${CLAUDE_CODE_OAUTH_TOKEN:-none}\",\"usage\":{}}"; exit 0; }
 case "$FAKE_MODE" in
   ok)    echo '{"is_error":false,"result":"hello from sub","total_cost_usd":0.0002,"usage":{"input_tokens":10,"output_tokens":3},"modelUsage":{"claude-haiku-5-5":{}}}' ;;
   limit) echo 'Claude AI usage limit reached|1999999999'; exit 1 ;;
@@ -127,4 +128,13 @@ with hydra_llm.urlopen(req, timeout=5) as resp:
 @test "phase 5 gate: no hard-coded model ID in Hydra code outside config/llm.json" {
     run_gw lint-models
     [ "$status" -eq 0 ] || { echo "$output"; false; }
+}
+
+@test "long-lived id8labs token reaches the sub lane, and is dropped when the profile is flagged expired" {
+    export FAKE_MODE=token HYDRA_LLM_SUB_TOKEN="fake-oauth"
+    run bash -c "echo hi | python3 '$GW' --job t --lanes sub"
+    [ "$output" = "tok=fake-oauth" ]
+    echo "EXPIRED now" > "$T/no-status"
+    run bash -c "echo hi | python3 '$GW' --job t --lanes sub 2>/dev/null"
+    [ "$output" = "tok=none" ]
 }

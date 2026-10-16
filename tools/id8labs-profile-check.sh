@@ -22,7 +22,10 @@ PREV="$(cut -d' ' -f1 "$STATUS_FILE" 2>/dev/null || echo UNKNOWN)"
 
 # Probe: a trivial prompt on the id8labs profile only. Never inherit an API key
 # (that would bill metered) and never let the default profile answer for it.
-RESP="$(printf 'Reply with exactly: ok' | CLAUDE_CONFIG_DIR="$CFG" ANTHROPIC_API_KEY= claude -p --model "$("$HOME/.hydra/bin/hydra-llm" model mid --lane sub)" 2>>"$LOG" || true)"
+# Same credential the gateway uses: the long-lived setup-token from Keychain when
+# present (does not expire like the browser login), else the config dir's login.
+TOKEN="$(security find-generic-password -a hydra -s claude-id8labs-oauth-token -w 2>/dev/null || true)"
+RESP="$(printf 'Reply with exactly: ok' | CLAUDE_CONFIG_DIR="$CFG" CLAUDE_CODE_OAUTH_TOKEN="$TOKEN" ANTHROPIC_API_KEY='' claude -p --model "$("$HOME/.hydra/bin/hydra-llm" model mid --lane sub)" 2>>"$LOG" || true)"
 
 if printf '%s' "$RESP" | grep -qiE '^[[:space:]]*ok' \
    && ! printf '%s' "$RESP" | grep -qiE 'login expired|profile login|/login|not authenticated|invalid api key'; then
@@ -34,11 +37,15 @@ fi
 echo "$STATUS $(date '+%FT%T%z')" > "$STATUS_FILE"
 log "status=$STATUS (prev=$PREV)"
 
-# Alert only on the transition INTO expired, so it's loud once, not spammy.
-if [ "$STATUS" = "EXPIRED" ] && [ "$PREV" != "EXPIRED" ]; then
+# Alert on the transition INTO expired, then once a day while it stays expired.
+# (One alert only, 2026-09-20, let the fleet bill the personal plan for 26 days.)
+STAMP="$HOME/.claude/.id8labs-profile-alerted"
+[ "$STATUS" = "OK" ] && rm -f "$STAMP"
+if [ "$STATUS" = "EXPIRED" ] && { [ "$PREV" != "EXPIRED" ] || [ -z "$(find "$STAMP" -mmin -1440 2>/dev/null)" ]; }; then
+  touch "$STAMP"
   log "ALERT: id8labs profile went EXPIRED; fleet now bills the DEFAULT (personal) profile"
   "$HOME/.hydra/daemons/notify-eddie.sh" urgent "id8labs Claude login expired" \
-    "The fleet is falling back to your PERSONAL subscription until you re-login. In Terminal: CLAUDE_CONFIG_DIR=\"\$HOME/.claude-id8labs\" claude  then /login." 2>/dev/null || true
+    "The fleet is falling back to your PERSONAL subscription until you re-login. In Terminal: CLAUDE_CONFIG_DIR=\"\$HOME/.claude-id8labs\" claude  then /login. Or end the re-logins: claude setup-token, then store it in Keychain as claude-id8labs-oauth-token (see ~/.hydra/docs/LLM-GATEWAY.md)." 2>/dev/null || true
 fi
 
 exit 0

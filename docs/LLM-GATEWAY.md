@@ -85,6 +85,12 @@ a new model through an alias). Upgrading a tier is one edit in `config/llm.json`
 
 ## Eddie's gates
 
-1. id8labs subscription re-login: `CLAUDE_CONFIG_DIR=~/.claude-id8labs claude`, then `/login`.
+1. id8labs subscription login. DONE 10/16 (eb@id8labs.tech, Max). The browser
+   login expires; to end re-logins, mint a long-lived token once:
+   `CLAUDE_CONFIG_DIR=~/.claude-id8labs claude setup-token`, sign in as
+   id8labs, copy the token it prints, then
+   `security add-generic-password -U -a hydra -s claude-id8labs-oauth-token -w "$(pbpaste)"`.
+   The gateway, `id8labs-sub.env` and the 2-hourly probe all read it from
+   Keychain. While the profile is expired the probe alerts once a day.
 2. API cap (money): only live chat needs the metered key after phase 1.
 3. SubQ key: `security add-generic-password -U -a hydra -s subq-api-key -w "$(pbpaste)"`, plus the ZDR form.
