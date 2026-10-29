@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.id8labs.ops-runner-refresh</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/eddiebelaval/.hydra/tools/ops-runner-refresh.sh</string>
+  </array>
+  <key>StartInterval</key>
+  <integer>1800</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/eddiebelaval/Library/Logs/id8labs-ops-runner-refresh.out</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/eddiebelaval/Library/Logs/id8labs-ops-runner-refresh.err</string>
+</dict>
+</plist>
