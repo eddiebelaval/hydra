@@ -8,9 +8,10 @@
 #
 # Every run (launchd com.id8labs.ops-runner-refresh, every 30 min + RunAtLoad):
 #   0. LOCK; rebuild the runner from origin/main if it is gone (and keep it pinned).
-#   1. PROVE the cwd IS the runner (not a symlink, detached, this repo, no uncommitted edits),
-#      then HARD RESET to origin/main. Never merge. Commits found on the runner go to a
-#      runner-stray-* branch first.
+#   1. PROVE the cwd IS the runner (not a symlink, detached, this repo, no uncommitted edits).
+#      GATE: if main changed tools/synapse or tools/kev-ondemand, run their tests on main's
+#      commit in a throwaway checkout; red holds the runner. Then HARD RESET to origin/main.
+#      Never merge. Commits found on the runner go to a runner-stray-* branch first.
 #   2. RESTART the Kev gatekeeper when its code changed (it is the one long-running process;
 #      sweep, health and the hooks start fresh each run). A changed launchd plist is flagged,
 #      not reinstalled: installing a job stays a reviewed step.
@@ -76,6 +77,26 @@ COMMON="$(cd "$(git rev-parse --git-common-dir 2>/dev/null)" 2>/dev/null && pwd 
 
 OLD="$(git rev-parse HEAD 2>/dev/null)"
 if git fetch origin main --quiet 2>/dev/null; then
+  # GATE: a merge to main is a release here (the drain hook runs on every prompt in every
+  # session). When main changes the ops tools, their tests must pass on main's exact commit,
+  # in a throwaway checkout, before the runner moves. Red holds the runner where it is.
+  TARGET="$(git rev-parse origin/main 2>/dev/null)"
+  if [ "$TARGET" != "$OLD" ] && [ -n "$(git diff --name-only "$OLD" "$TARGET" -- tools/synapse tools/kev-ondemand 2>/dev/null)" ]; then
+    GATE="$(mktemp -d "${TMPDIR:-/tmp}/ops-runner-gate.XXXXXX")"
+    git -C "$MAIN" worktree add --detach --force "$GATE" "$TARGET" --quiet 2>/dev/null || note "could not check out $TARGET to test it"
+    (cd "$GATE/tools" 2>/dev/null && /usr/bin/python3 -m pytest synapse kev-ondemand -q -p no:cacheprovider > "$STATE/gate-tests.log" 2>&1)
+    RC=$?
+    git -C "$MAIN" worktree remove --force "$GATE" 2>/dev/null; rm -rf "$GATE"
+    # pytest exit 5 = no tests collected (nothing to fail)
+    if [ "$RC" -ne 0 ] && [ "$RC" -ne 5 ]; then
+      if grep -q "No module named pytest" "$STATE/gate-tests.log" 2>/dev/null; then
+        note "could not run the gate on main $(git rev-parse --short "$TARGET"): pytest missing for /usr/bin/python3; runner held at $(git rev-parse --short "$OLD")"
+      else
+        note "main $(git rev-parse --short "$TARGET") fails the Synapse/Kev tests (exit $RC, $STATE/gate-tests.log); runner held at $(git rev-parse --short "$OLD"). Fix or revert on main."
+      fi
+      finish
+    fi
+  fi
   AHEAD="$(git rev-list --count origin/main..HEAD 2>/dev/null || echo 0)"
   [ "$AHEAD" != "0" ] && git branch -f "runner-stray-$(date +%Y%m%d%H%M)" HEAD >/dev/null 2>&1
   git reset --hard origin/main --quiet 2>/dev/null || note "reset to origin/main failed"

@@ -7,6 +7,8 @@ SCRIPT="$HOME/.hydra/tools/ops-runner-refresh.sh"
 
 setup() {
     REAL_SCRIPT="$SCRIPT"
+    # the gate's pytest lives in the real user site-packages; a moved HOME would hide it
+    PYTHONUSERBASE="$(/usr/bin/python3 -m site --user-base)"; export PYTHONUSERBASE
     export HOME="$BATS_TEST_TMPDIR/home"
     mkdir -p "$HOME/bin" "$HOME/Development/.worktrees/id8" "$HOME/Library/LaunchAgents"
     printf '#!/bin/bash\necho "launchctl $*" >> "%s/launchctl.calls"\n' "$HOME" > "$HOME/bin/launchctl"
@@ -101,4 +103,38 @@ push_main() {  # push_main <file> <content>
     run "$REAL_SCRIPT"
     [ "$(cat "$RUN/tools/synapse/synapse.py")" = s1 ]
     grep -q "another refresh is running" "$HOME/Library/Logs/id8labs-ops-runner-refresh.log"
+}
+
+@test "gate: main whose Synapse tests fail holds the runner and says so" {
+    printf 'def test_broken():\n    assert False\n' > "$M/tools/synapse/test_gate.py"
+    push_main tools/synapse/synapse.py s2-broken
+    run "$REAL_SCRIPT"
+    [ "$(cat "$RUN/tools/synapse/synapse.py")" = s1 ]
+    grep -q "fails the Synapse/Kev tests" "$STATE/HEALTH.txt"
+    [ "$(git -C "$M" worktree list | grep -c ops-runner-gate)" -eq 0 ]  # throwaway checkout cleaned up
+}
+
+@test "gate: main whose tests pass moves the runner" {
+    printf 'def test_ok():\n    assert True\n' > "$M/tools/synapse/test_gate.py"
+    push_main tools/synapse/synapse.py s2
+    run "$REAL_SCRIPT"
+    [ "$(cat "$RUN/tools/synapse/synapse.py")" = s2 ]
+    [ ! -e "$STATE/HEALTH.txt" ]
+}
+
+@test "gate: a change outside the ops tools skips the tests and moves" {
+    printf 'def test_broken():\n    assert False\n' > "$M/tools/synapse/test_gate.py"
+    git -C "$M" add tools/synapse/test_gate.py; git -C "$M" commit -qm "red test lands"; git -C "$M" push -q origin HEAD:main
+    git -C "$RUN" fetch -q origin; git -C "$RUN" reset -q --hard origin/main
+    push_main README.md docs-only
+    run "$REAL_SCRIPT"
+    [ "$(cat "$RUN/README.md")" = docs-only ]
+}
+
+@test "gate: a gate that cannot run says so, and still holds the runner" {
+    export PYTHONUSERBASE="$BATS_TEST_TMPDIR/no-site"; export PYTHONNOUSERSITE=1
+    push_main tools/synapse/synapse.py s2
+    run "$REAL_SCRIPT"
+    [ "$(cat "$RUN/tools/synapse/synapse.py")" = s1 ]
+    grep -q "could not run the gate" "$STATE/HEALTH.txt"
 }
