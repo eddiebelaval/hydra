@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Keystone hub data-only refresh (standing rule, Eddie 2026-10-08). Install only after its
+     Prometheus GO: cp to ~/Library/LaunchAgents/ and launchctl load.
+     2026-11-05: runs through ~/.hydra/tools/keystone-hub-refresh-run.sh. Code and pod-hub come from
+     the clean worktree ~/Development/.worktrees/keystone/hub-refresh (origin/main only); the board
+     (tasks/INTERNAL-TASKS.json) is read from the shared checkout's working copy, so it stays
+     watched here. Hourly picks up merged pod-hub changes. Failures alert Keystone over Synapse. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.id8labs.keystone-hub-refresh</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/eddiebelaval/.hydra/tools/keystone-hub-refresh-run.sh</string>
+  </array>
+  <key>WatchPaths</key>
+  <array>
+    <string>/Users/eddiebelaval/Development/keystone/tasks/INTERNAL-TASKS.json</string>
+  </array>
+  <key>StartInterval</key><integer>3600</integer>
+  <key>ThrottleInterval</key><integer>120</integer>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/eddiebelaval/Library/Logs/keystone-hub-refresh.out.log</string>
+  <key>StandardErrorPath</key><string>/Users/eddiebelaval/Library/Logs/keystone-hub-refresh.out.log</string>
+</dict>
+</plist>
