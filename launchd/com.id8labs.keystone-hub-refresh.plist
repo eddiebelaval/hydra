@@ -5,7 +5,7 @@
      2026-11-05: runs through ~/.hydra/tools/keystone-hub-refresh-run.sh. Code and pod-hub come from
      the clean worktree ~/Development/.worktrees/keystone/hub-refresh (origin/main only); the board
      (tasks/INTERNAL-TASKS.json) is read from the shared checkout's working copy, so it stays
-     watched here. Hourly picks up merged pod-hub changes. Failures alert Keystone over Synapse. -->
+     watched here. Hourly picks up merged pod-hub changes. Failures alert Keystone over Synapse and Eddie over Telegram, deduped per 6 h, from the runner only (hub-refresh.sh runs with NOTIFY empty). Silence is Rosy PUBLISHER. -->
 <plist version="1.0">
 <dict>
   <key>Label</key><string>com.id8labs.keystone-hub-refresh</string>

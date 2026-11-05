@@ -13,7 +13,9 @@
 # Failures alert Keystone over Synapse AND Eddie over Telegram (NOTIFY), once per distinct failure per
 # 6 hours; the first good run after a failure sends one "recovered" notice. Silence (job unloaded, no
 # run for hours) is Rosy's watch, since a job that never runs cannot report itself.
-# DRY_RUN and NOTIFY pass through to hub-refresh.sh unchanged. Tests: ~/.hydra/tests/09-keystone-hub-refresh-run.bats
+# DRY_RUN passes through to hub-refresh.sh. NOTIFY does NOT: the child runs with NOTIFY= so its own
+# undeduped Telegram on every failed run is off, and this runner sends the one deduped alert instead.
+# The child's alert file lands in the worktree's tasks/HUB-REFRESH-ALERT.md (not the shared checkout). Tests: ~/.hydra/tests/09-keystone-hub-refresh-run.bats
 set -u
 W="${HUB_REFRESH_WT:-$HOME/Development/.worktrees/keystone/hub-refresh}"
 KS_BOARD="${KS_BOARD:-$HOME/Development/keystone/tasks/INTERNAL-TASKS.json}"
@@ -61,7 +63,10 @@ if mkdir "$RUNLOCK" 2>/dev/null; then
 else
   age=$(( $(date +%s) - $(stat -f %m "$RUNLOCK" 2>/dev/null || date +%s) ))
   owner=$(cat "$RUNLOCK/pid" 2>/dev/null)
-  if [ "$age" -gt 7200 ] && { [ -z "$owner" ] || ! kill -0 "$owner" 2>/dev/null; } \
+  # Alive means: that PID exists AND is still this runner (a reused PID after a reboot does not count).
+  alive=0
+  if [ -n "$owner" ] && ps -p "$owner" -o command= 2>/dev/null | grep -q 'keystone-hub-refresh-run[.]sh'; then alive=1; fi
+  if [ "$age" -gt 7200 ] && [ "$alive" = "0" ] \
      && rm -f "$RUNLOCK/pid" && rmdir "$RUNLOCK" 2>/dev/null && mkdir "$RUNLOCK" 2>/dev/null; then
     HELD=1; log "cleared a stale run lock (${age}s old, owner ${owner:-unknown} gone)"
   else
@@ -82,7 +87,7 @@ n=$(/usr/bin/python3 -c 'import json,sys; t=json.load(open(sys.argv[1])); print(
 if [ "${n:-0}" -lt "$MIN_TASKS" ]; then log "board has ${n:-0} tasks"; alert "board under the $MIN_TASKS-task minimum: $KS_BOARD"; fi
 cp "$KS_BOARD" "$W/tasks/INTERNAL-TASKS.json" || alert "copy board"
 log "source $(git -C "$W" rev-parse --short HEAD) (origin/main) + board from $KS_BOARD"
-KS="$W" /bin/bash "$REFRESH"
+KS="$W" NOTIFY='' /bin/bash "$REFRESH"
 rc=$?
 [ "$rc" -eq 0 ] || alert "hub-refresh.sh exit $rc"
 if [ "${DRY_RUN:-0}" != "1" ] && [ -f "$ALERT_STATE" ]; then

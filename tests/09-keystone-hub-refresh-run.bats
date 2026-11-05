@@ -19,7 +19,7 @@ setup() {
   # Stub refresh: records that it ran, with which KS and which board.
   cat > "$S/refresh.sh" <<EOF
 #!/bin/bash
-echo "ran KS=\$KS board=\$(head -c 13 \$KS/tasks/INTERNAL-TASKS.json) code=\$(cat \$KS/code.txt)" >> "$S/calls"
+echo "ran NOTIFY=[\${NOTIFY-unset}] KS=\$KS board=\$(head -c 13 \$KS/tasks/INTERNAL-TASKS.json) code=\$(cat \$KS/code.txt)" >> "$S/calls"
 exit \${STUB_RC:-0}
 EOF
   cat > "$S/synapse" <<EOF
@@ -153,14 +153,45 @@ teardown() { rm -rf "$S"; }
   [ -e "$S/calls" ]
 }
 
-@test "old lock whose owner is still alive is never taken over" {
+@test "old lock whose owner is a live runner is never taken over" {
+  /bin/bash -c 'sleep 30; :' keystone-hub-refresh-run.sh &
+  P=$!
+  mkdir "$S/lock"
+  echo "$P" > "$S/lock/pid"
+  touch -t 202001010000 "$S/lock"
+  run "$RUNNER"
+  kill "$P"
+  [ "$status" -eq 0 ]
+  grep -q 'skipping' "$S/log"
+  [ ! -e "$S/calls" ]
+}
+
+@test "old lock with a dead owner is taken over" {
+  mkdir "$S/lock"
+  echo 999999 > "$S/lock/pid"
+  touch -t 202001010000 "$S/lock"
+  run "$RUNNER"
+  [ "$status" -eq 0 ]
+  grep -q 'owner 999999 gone' "$S/log"
+  [ -e "$S/calls" ]
+}
+
+@test "old lock whose PID was reused by some other process is taken over" {
   mkdir "$S/lock"
   echo $$ > "$S/lock/pid"
   touch -t 202001010000 "$S/lock"
   run "$RUNNER"
   [ "$status" -eq 0 ]
-  grep -q 'skipping' "$S/log"
-  [ ! -e "$S/calls" ]
+  grep -q 'cleared a stale run lock' "$S/log"
+  [ -e "$S/calls" ]
+}
+
+@test "the child never gets NOTIFY, so only the runner's deduped alert reaches Eddie" {
+  run "$RUNNER"
+  grep -q 'NOTIFY=\[\]' "$S/calls"
+  unset NOTIFY
+  run "$RUNNER"
+  [ "$(grep -c 'NOTIFY=\[\]' "$S/calls")" -eq 2 ]
 }
 
 @test "lock just under 2 h with a dead owner is not cleared" {
