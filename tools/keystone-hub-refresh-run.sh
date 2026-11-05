@@ -33,14 +33,14 @@ tell_eddie() { if [ -n "$NOTIFY" ] && [ -x "$NOTIFY" ]; then "$NOTIFY" "$1" >/de
 alert() {
   log "FAIL $1"
   unlock
-  if [ "${DRY_RUN:-0}" != "1" ] && [ -x "$SYNAPSE" ]; then
+  if [ "${DRY_RUN:-0}" != "1" ]; then
     now=$(date +%s); last_msg=""; last_at=0
     if [ -f "$ALERT_STATE" ]; then last_at=$(head -n 1 "$ALERT_STATE"); last_msg=$(sed -n 2p "$ALERT_STATE"); fi
     case "$last_at" in ''|*[!0-9]*) last_at=0 ;; esac
     if [ "$last_msg" != "$1" ] || [ $((now - last_at)) -ge 21600 ]; then
       body="What to do: fix the cause below, then run DRY_RUN=1 NOTIFY= ~/.hydra/tools/keystone-hub-refresh-run.sh and check the log. Log tail:
 $(tail -n 15 "$LOG")"
-      if "$SYNAPSE" send --from ops --to keystone --kind notice --priority high \
+      if [ -x "$SYNAPSE" ] && "$SYNAPSE" send --from ops --to keystone --kind notice --priority high \
            --subject "Hub refresh failed: $1" --body "$body" >/dev/null 2>&1; then
         :
       else
@@ -78,7 +78,8 @@ git -C "$W" reset -q --hard origin/main || alert "reset to origin/main"
 [ -f "$KS_BOARD" ] || alert "board missing: $KS_BOARD"
 /usr/bin/python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$KS_BOARD" 2>/dev/null || alert "board is not valid JSON: $KS_BOARD"
 n=$(/usr/bin/python3 -c 'import json,sys; t=json.load(open(sys.argv[1])); print(len(t.get("tasks") or []) if isinstance(t, dict) else 0)' "$KS_BOARD" 2>/dev/null)
-[ "${n:-0}" -ge "$MIN_TASKS" ] || alert "board has ${n:-0} tasks, under the $MIN_TASKS minimum: $KS_BOARD"
+# The count goes to the log, not the alert text, so a shrinking board alerts once, not once per count.
+if [ "${n:-0}" -lt "$MIN_TASKS" ]; then log "board has ${n:-0} tasks"; alert "board under the $MIN_TASKS-task minimum: $KS_BOARD"; fi
 cp "$KS_BOARD" "$W/tasks/INTERNAL-TASKS.json" || alert "copy board"
 log "source $(git -C "$W" rev-parse --short HEAD) (origin/main) + board from $KS_BOARD"
 KS="$W" /bin/bash "$REFRESH"

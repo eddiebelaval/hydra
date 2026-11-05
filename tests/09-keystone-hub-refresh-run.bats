@@ -116,12 +116,23 @@ teardown() { rm -rf "$S"; }
   echo '{"tasks": [1]}' > "$S/board.json"
   run "$RUNNER"
   [ "$status" -eq 1 ]
-  grep -q 'FAIL board has 1 tasks, under the 3 minimum' "$S/log"
+  grep -q 'board has 1 tasks' "$S/log"
+  grep -q 'FAIL board under the 3-task minimum' "$S/log"
   [ ! -e "$S/calls" ]
   echo '[]' > "$S/board.json"
   run "$RUNNER"
   [ "$status" -eq 1 ]
   [ ! -e "$S/calls" ]
+  [ "$(wc -l < "$S/phone")" -eq 1 ]
+}
+
+@test "missing synapse still reaches Eddie by Telegram" {
+  export SYNAPSE="$S/no-synapse"
+  printf '{broken' > "$S/board.json"
+  run "$RUNNER"
+  [ "$status" -eq 1 ]
+  [ "$(wc -l < "$S/phone")" -eq 1 ]
+  grep -q 'synapse alert not sent' "$S/log"
 }
 
 @test "held lock: second run skips without calling refresh" {
