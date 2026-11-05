@@ -19,17 +19,22 @@ setup() {
   # Stub refresh: records that it ran, with which KS and which board.
   cat > "$S/refresh.sh" <<EOF
 #!/bin/bash
-echo "ran KS=\$KS board=\$(cat \$KS/tasks/INTERNAL-TASKS.json) code=\$(cat \$KS/code.txt)" >> "$S/calls"
+echo "ran KS=\$KS board=\$(head -c 13 \$KS/tasks/INTERNAL-TASKS.json) code=\$(cat \$KS/code.txt)" >> "$S/calls"
 exit \${STUB_RC:-0}
 EOF
   cat > "$S/synapse" <<EOF
 #!/bin/bash
 echo call >> "$S/alerts"; echo "\$*" >> "$S/alerts.full"
 EOF
-  chmod +x "$S/refresh.sh" "$S/synapse"
-  echo '{"new": true}' > "$S/board.json"
+  cat > "$S/notify" <<EOF
+#!/bin/bash
+echo "\$1" >> "$S/phone"
+EOF
+  chmod +x "$S/refresh.sh" "$S/synapse" "$S/notify"
+  echo '{"new": true, "tasks": [1, 2, 3]}' > "$S/board.json"
   export HUB_REFRESH_WT="$S/wt" KS_BOARD="$S/board.json" LOG="$S/log" SYNAPSE="$S/synapse" \
-         HUB_REFRESH_SCRIPT="$S/refresh.sh" RUNLOCK="$S/lock" ALERT_STATE="$S/last-alert"
+         HUB_REFRESH_SCRIPT="$S/refresh.sh" RUNLOCK="$S/lock" ALERT_STATE="$S/last-alert" \
+         NOTIFY="$S/notify" MIN_TASKS=3
   unset DRY_RUN
 }
 
@@ -42,8 +47,9 @@ teardown() { rm -rf "$S"; }
   echo 'local junk' > "$S/wt/code.txt"
   run "$RUNNER"
   [ "$status" -eq 0 ]
-  grep -q 'board={"new": true} code=v2' "$S/calls"
+  grep -q 'board={"new": true, code=v2' "$S/calls"
   [ ! -e "$S/alerts" ]
+  [ ! -e "$S/phone" ]
   [ ! -d "$S/lock" ]
 }
 
@@ -55,6 +61,7 @@ teardown() { rm -rf "$S"; }
   [ ! -e "$S/calls" ]
   [ "$(wc -l < "$S/alerts")" -eq 1 ]
   grep -q 'What to do' "$S/alerts.full"
+  [ "$(wc -l < "$S/phone")" -eq 1 ]
   [ ! -d "$S/lock" ]
 }
 
@@ -91,6 +98,10 @@ teardown() { rm -rf "$S"; }
   run "$RUNNER"
   [ "$status" -eq 0 ]
   [ ! -f "$S/last-alert" ]
+  grep -q 'recovered' "$S/phone"
+  grep -q 'Hub refresh recovered' "$S/alerts.full"
+  run "$RUNNER"
+  [ "$(grep -c recovered "$S/phone")" -eq 1 ]
 }
 
 @test "dry run never alerts" {
@@ -98,10 +109,24 @@ teardown() { rm -rf "$S"; }
   DRY_RUN=1 run "$RUNNER"
   [ "$status" -eq 1 ]
   [ ! -e "$S/alerts" ]
+  [ ! -e "$S/phone" ]
+}
+
+@test "valid but thin board (under MIN_TASKS) stops before publishing" {
+  echo '{"tasks": [1]}' > "$S/board.json"
+  run "$RUNNER"
+  [ "$status" -eq 1 ]
+  grep -q 'FAIL board has 1 tasks, under the 3 minimum' "$S/log"
+  [ ! -e "$S/calls" ]
+  echo '[]' > "$S/board.json"
+  run "$RUNNER"
+  [ "$status" -eq 1 ]
+  [ ! -e "$S/calls" ]
 }
 
 @test "held lock: second run skips without calling refresh" {
   mkdir "$S/lock"
+  echo $$ > "$S/lock/pid"
   run "$RUNNER"
   [ "$status" -eq 0 ]
   grep -q 'skipping' "$S/log"
@@ -115,4 +140,24 @@ teardown() { rm -rf "$S"; }
   [ "$status" -eq 0 ]
   grep -q 'cleared a stale run lock' "$S/log"
   [ -e "$S/calls" ]
+}
+
+@test "old lock whose owner is still alive is never taken over" {
+  mkdir "$S/lock"
+  echo $$ > "$S/lock/pid"
+  touch -t 202001010000 "$S/lock"
+  run "$RUNNER"
+  [ "$status" -eq 0 ]
+  grep -q 'skipping' "$S/log"
+  [ ! -e "$S/calls" ]
+}
+
+@test "lock just under 2 h with a dead owner is not cleared" {
+  mkdir "$S/lock"
+  echo 999999 > "$S/lock/pid"
+  touch -t "$(date -v-7140S +%Y%m%d%H%M.%S)" "$S/lock"
+  run "$RUNNER"
+  [ "$status" -eq 0 ]
+  grep -q 'skipping' "$S/log"
+  [ ! -e "$S/calls" ]
 }
