@@ -39,6 +39,8 @@ alert() {
     now=$(date +%s); last_msg=""; last_at=0
     if [ -f "$ALERT_STATE" ]; then last_at=$(head -n 1 "$ALERT_STATE"); last_msg=$(sed -n 2p "$ALERT_STATE"); fi
     case "$last_at" in ''|*[!0-9]*) last_at=0 ;; esac
+    # Same failure inside 6 h stays quiet EVEN IF a clean run came in between (poll r7 L5: a flapping
+    # failure must not page on every switch). The state file outlives recoveries; line 3 marks one.
     if [ "$last_msg" != "$1" ] || [ $((now - last_at)) -ge 21600 ]; then
       body="What to do: fix the cause below, then run DRY_RUN=1 NOTIFY= ~/.hydra/tools/keystone-hub-refresh-run.sh and check the log. Log tail:
 $(tail -n 15 "$LOG")"
@@ -48,7 +50,7 @@ $(tail -n 15 "$LOG")"
       else
         log "synapse alert not sent"
       fi
-      tell_eddie "Keystone hub refresh stopped: $1. Log: $LOG"
+      tell_eddie "Keystone hub refresh stopped: $1. What to do: fix that, then DRY_RUN=1 NOTIFY= ~/.hydra/tools/keystone-hub-refresh-run.sh and read $LOG"
       mkdir -p "$(dirname "$ALERT_STATE")" && printf '%s\n%s\n' "$now" "$1" > "$ALERT_STATE"
     fi
   fi
@@ -81,18 +83,23 @@ git -C "$W" fetch -q origin || alert "fetch origin"
 # Dedicated folder: only the refresh's own generated files and the copied board can differ.
 git -C "$W" reset -q --hard origin/main || alert "reset to origin/main"
 [ -f "$KS_BOARD" ] || alert "board missing: $KS_BOARD"
-/usr/bin/python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$KS_BOARD" 2>/dev/null || alert "board is not valid JSON: $KS_BOARD"
-n=$(/usr/bin/python3 -c 'import json,sys; t=json.load(open(sys.argv[1])); print(len(t.get("tasks") or []) if isinstance(t, dict) else 0)' "$KS_BOARD" 2>/dev/null)
+# Copy first, then validate the COPY, so what publishes is exactly what was checked.
+BTMP="$W/tasks/.INTERNAL-TASKS.json.tmp"
+cp "$KS_BOARD" "$BTMP" || alert "copy board"
+/usr/bin/python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$BTMP" 2>/dev/null || { rm -f "$BTMP"; alert "board is not valid JSON: $KS_BOARD"; }
+# Only task OBJECTS count toward the floor (strings or nulls do not).
+n=$(/usr/bin/python3 -c 'import json,sys; t=json.load(open(sys.argv[1])); ts=t.get("tasks") if isinstance(t, dict) else None; print(sum(isinstance(x, dict) for x in ts) if isinstance(ts, list) else 0)' "$BTMP" 2>/dev/null)
 # The count goes to the log, not the alert text, so a shrinking board alerts once, not once per count.
-if [ "${n:-0}" -lt "$MIN_TASKS" ]; then log "board has ${n:-0} tasks"; alert "board under the $MIN_TASKS-task minimum: $KS_BOARD"; fi
-cp "$KS_BOARD" "$W/tasks/INTERNAL-TASKS.json" || alert "copy board"
+if [ "${n:-0}" -lt "$MIN_TASKS" ]; then rm -f "$BTMP"; log "board has ${n:-0} task objects"; alert "board under the $MIN_TASKS-task minimum: $KS_BOARD"; fi
+mv "$BTMP" "$W/tasks/INTERNAL-TASKS.json" || alert "copy board"
 log "source $(git -C "$W" rev-parse --short HEAD) (origin/main) + board from $KS_BOARD"
 KS="$W" NOTIFY='' /bin/bash "$REFRESH"
 rc=$?
 [ "$rc" -eq 0 ] || alert "hub-refresh.sh exit $rc"
-if [ "${DRY_RUN:-0}" != "1" ] && [ -f "$ALERT_STATE" ]; then
-  rm -f "$ALERT_STATE"
-  "$SYNAPSE" send --from ops --to keystone --kind notice --subject "Hub refresh recovered" \
+# One "recovered" per alert: mark it on line 3 and keep the record, so the 6 h hold survives the recovery.
+if [ "${DRY_RUN:-0}" != "1" ] && [ -f "$ALERT_STATE" ] && [ "$(sed -n 3p "$ALERT_STATE")" != "recovered" ]; then
+  printf '%s\n%s\nrecovered\n' "$(head -n 1 "$ALERT_STATE")" "$(sed -n 2p "$ALERT_STATE")" > "$ALERT_STATE.tmp" && mv "$ALERT_STATE.tmp" "$ALERT_STATE"
+  [ -x "$SYNAPSE" ] && "$SYNAPSE" send --from ops --to keystone --kind notice --subject "Hub refresh recovered" \
     --body "The hub refresh ran clean again. Log: $LOG" >/dev/null 2>&1 || log "synapse recovery notice not sent"
   tell_eddie "Keystone hub refresh recovered."
 fi

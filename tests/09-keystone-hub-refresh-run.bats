@@ -31,7 +31,7 @@ EOF
 echo "\$1" >> "$S/phone"
 EOF
   chmod +x "$S/refresh.sh" "$S/synapse" "$S/notify"
-  echo '{"new": true, "tasks": [1, 2, 3]}' > "$S/board.json"
+  echo '{"new": true, "tasks": [{}, {}, {}]}' > "$S/board.json"
   export HUB_REFRESH_WT="$S/wt" KS_BOARD="$S/board.json" LOG="$S/log" SYNAPSE="$S/synapse" \
          HUB_REFRESH_SCRIPT="$S/refresh.sh" RUNLOCK="$S/lock" ALERT_STATE="$S/last-alert" \
          NOTIFY="$S/notify" MIN_TASKS=3
@@ -97,11 +97,38 @@ teardown() { rm -rf "$S"; }
   [ -f "$S/last-alert" ]
   run "$RUNNER"
   [ "$status" -eq 0 ]
-  [ ! -f "$S/last-alert" ]
+  [ "$(sed -n 3p "$S/last-alert")" = "recovered" ]
   grep -q 'recovered' "$S/phone"
   grep -q 'Hub refresh recovered' "$S/alerts.full"
   run "$RUNNER"
   [ "$(grep -c recovered "$S/phone")" -eq 1 ]
+}
+
+@test "a flapping failure pages once and recovers once inside 6 h; a new failure still pages" {
+  for rc in 3 0 3 0 3 0; do STUB_RC=$rc run "$RUNNER"; done
+  [ "$(grep -c 'stopped' "$S/phone")" -eq 1 ]
+  [ "$(grep -c 'recovered' "$S/phone")" -eq 1 ]
+  STUB_RC=4 run "$RUNNER"
+  [ "$(grep -c 'stopped' "$S/phone")" -eq 2 ]
+  run "$RUNNER"
+  [ "$(grep -c 'recovered' "$S/phone")" -eq 2 ]
+}
+
+@test "the same failure pages again after 6 h, even across a recovery" {
+  STUB_RC=3 run "$RUNNER"
+  run "$RUNNER"
+  printf '%s\n%s\nrecovered\n' "$(( $(date +%s) - 21601 ))" "hub-refresh.sh exit 3" > "$S/last-alert"
+  STUB_RC=3 run "$RUNNER"
+  [ "$(grep -c 'stopped' "$S/phone")" -eq 2 ]
+}
+
+@test "tasks that are not objects do not count toward the floor; nothing publishes" {
+  echo '{"tasks": ["a", null, 7]}' > "$S/board.json"
+  run "$RUNNER"
+  [ "$status" -eq 1 ]
+  grep -q 'board has 0 task objects' "$S/log"
+  [ ! -e "$S/calls" ]
+  [ ! -e "$S/wt/tasks/.INTERNAL-TASKS.json.tmp" ]
 }
 
 @test "dry run never alerts" {
@@ -113,10 +140,10 @@ teardown() { rm -rf "$S"; }
 }
 
 @test "valid but thin board (under MIN_TASKS) stops before publishing" {
-  echo '{"tasks": [1]}' > "$S/board.json"
+  echo '{"tasks": [{}]}' > "$S/board.json"
   run "$RUNNER"
   [ "$status" -eq 1 ]
-  grep -q 'board has 1 tasks' "$S/log"
+  grep -q 'board has 1 task objects' "$S/log"
   grep -q 'FAIL board under the 3-task minimum' "$S/log"
   [ ! -e "$S/calls" ]
   echo '[]' > "$S/board.json"
