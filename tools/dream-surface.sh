@@ -16,7 +16,10 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] surface: $*" >> "$LOG_FILE"; }
 [ -f "$DREAM_FILE" ] || { log "no DREAM.md to surface"; exit 0; }
 
 # Only surface a dream generated in the last ~18h (don't re-open a stale one).
-if find "$DREAM_FILE" -newermt '18 hours ago' >/dev/null 2>&1; then :; else
+# freshness by age in seconds: `find -newermt '18 hours ago'` exits 0 whether or not it matched, so a January
+# dream read as fresh (found 11/07; same class as feedback-bsd-find-newermt-relative-date-fails-open)
+AGE_S=$(( $(date +%s) - $(stat -f %m "$DREAM_FILE" 2>/dev/null || echo 0) ))
+if [ "$AGE_S" -le 64800 ]; then :; else
   log "DREAM.md is stale (>18h); not surfacing"; exit 0
 fi
 

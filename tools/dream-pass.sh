@@ -1,8 +1,8 @@
 #!/bin/bash
 # dream-pass.sh — Nightly memory-synthesis "dreaming" pass (ADVISORY ONLY).
 #
-# Runs daily at 3:00am via launchd (after hydra-reflector 2am, before the
-# 9am wake-jobs). Reads the three knowledge layers — FIELD_NOTES timeline,
+# Runs as step 1 of the ONE dream (dream-sweep.sh, 03:30 launchd), not on its own: its separate 3am
+# job was folded in 11/07 (Eddie: one dream, not two). Was: daily 3:00am, after hydra-reflector 2am. Reads the three knowledge layers — FIELD_NOTES timeline,
 # the memory/ topic files, the knowledge/ KB index — plus git activity and
 # the project-staleness classification, and asks Claude (sonnet, via
 # `claude -p`) to surface cross-day, cross-layer findings in 5 lenses:
@@ -23,10 +23,20 @@ set -uo pipefail
 source "$HOME/.hydra/tools/tend-lib.sh" 2>/dev/null || true
 trap 'rc=$?; if [ "$rc" -eq 0 ]; then tend_report dream-pass GREEN "dream pass complete" 24; else tend_report dream-pass RED "exited $rc" 24 "dream pass failed (exit $rc)" "read the dream log; owns its lane"; fi' EXIT
 
+# Bill this job to metered API usage instead of Eddie's interactive Claude
+# subscription (2026-07-31). Sourced AFTER the tend trap on purpose: the loader
+# hard-exits 78 when the Keychain key is missing, and we want that to arrive as
+# a RED tend report rather than a silent death. Disables claude.ai connectors —
+# fine here, this job touches no Gmail/Slack connector.
+source "$HOME/.claude/id8labs-sub.env"  # 2026-08-17: id8labs SUBSCRIPTION (was metered API via automation.env)
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-MODEL="sonnet"                       # nightly cost discipline
+MODEL="$("$HOME/.hydra/bin/hydra-llm" model mid --lane sub)"              # nightly cost discipline. Pinned 2026-07-31:
+                                     # was the bare alias "sonnet", and an
+                                     # unattended 3am job must not let an alias
+                                     # float onto a new model silently.
 ID8="$HOME/Development/id8"
 FIELD_NOTES="$ID8/FIELD_NOTES.md"
 MEMORY_DIR="$HOME/.claude/projects/-Users-eddiebelaval-Development-id8/memory"
@@ -53,7 +63,12 @@ GATE_MIN_COMMITS=8                    # >=8 id8 commits since last run
 KB_INDEX_CAP=200                      # max KB files to index
 FINDING_CAP=12                        # mirrored in prompt; informational here
 HOT_MAX=40                            # newest-by-mtime memory files get full bodies; rest indexed
-MAX_INPUT_BYTES=520000                # ~130k tokens; hard guard below model ceiling
+FN_WINDOW_DAYS=60                     # FIELD_NOTES trailing window (was claimed but unimplemented)
+# Raised 2026-07-31 from 520000. The old value (~130k tokens) was sized for a
+# 200k-context model; this pass runs on Sonnet 5, which has a 1M context window.
+# ~225k tokens still leaves large headroom while giving the trailing window room
+# to breathe. Cost at Sonnet 5 input rates is roughly $0.45-0.70 per run.
+MAX_INPUT_BYTES=900000                # ~225k tokens; hard guard below model ceiling
 
 mkdir -p "$DREAM_DIR" "$LOG_DIR"
 log() { echo "$(date '+%H:%M:%S') $*" >> "$LOG_FILE"; }
@@ -147,8 +162,21 @@ OUT_JSON="$DREAM_DIR/.out-$DATE.json"
     echo "Current date: $DATE"
     echo
 
-    echo "=== FIELD_NOTES (trailing 60 days) ==="
-    if [[ -s "$FIELD_NOTES" ]]; then cat "$FIELD_NOTES"; else echo "(missing)"; fi
+    echo "=== FIELD_NOTES (trailing $FN_WINDOW_DAYS days) ==="
+    # Was `cat "$FIELD_NOTES"` — the header claimed a 60-day window that was never
+    # implemented, so this section grew without bound and pushed the assembled
+    # context past MAX_INPUT_BYTES (2026-07-29 onward). Keep undated lines (headers,
+    # prose) and drop dated entries older than the window.
+    if [[ -s "$FIELD_NOTES" ]]; then
+        FN_CUTOFF=$(date -v-"${FN_WINDOW_DAYS}"d +%Y-%m-%d)
+        # Portable to macOS BWK awk: no gawk-only match(s,r,a) capture arrays.
+        awk -v cutoff="$FN_CUTOFF" '
+            /^- 20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ { if (substr($0,3,10) >= cutoff) print; next }
+            { print }
+        ' "$FIELD_NOTES"
+    else
+        echo "(missing)"
+    fi
     echo
 
     echo "=== MEMORY INDEX (MEMORY.md) ==="

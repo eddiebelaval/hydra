@@ -52,6 +52,7 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"; }
 # Tend contract: self-report on every exit so the Gardener reads dream-sweep by its
 # own word, not a launchd exit code.
 source "$HYDRA/tools/tend-lib.sh" 2>/dev/null || true
+# shellcheck disable=SC2154  # rc is assigned inside the trap string
 trap 'rc=$?; if [ "$rc" -eq 0 ]; then tend_report dream-sweep GREEN "dream swept" 24; else tend_report dream-sweep RED "exited $rc" 24 "dream-sweep failed (exit $rc)" "read the dream-sweep log; the person-layer went dark"; fi' EXIT 2>/dev/null || true
 
 log "dream-sweep start ($DATE)"
@@ -175,9 +176,27 @@ VOZ_SNIP="$(head -c 4000 "$VOZ_GENOME" 2>/dev/null || echo '(voz genome unavaila
 PROMPT_FILE="$(mktemp)"
 RESPONSE_FILE="$(mktemp)"
 
+# ONE dream (Eddie 11/07 "i dont want 2"): the memory work runs here, first, so it does not depend on the
+# dream's own model call. Step 1, the review (dream-pass.sh, formerly its own 3am job: contradictions, stale
+# doctrine, merges, gaps, drift; report). Step 2, the correcting pass (dream_correct.py: the day's misses
+# against existing lessons, reversible fixes, the review's repeat findings to the board once). Both bill like
+# the dream: id8labs profile first, default profile when the judge could not reach the model.
+CORRECT="$HYDRA/tools/dream_correct.py"
+MISSES_JSON="$HOME_DIR/.claude/dream/misses-$(date +%Y-%m-%d).json"
+if [ "$BACKFILL" != 1 ]; then
+  /bin/bash "$HYDRA/tools/dream-pass.sh" >> "$LOG_FILE" 2>&1 || log "memory review (dream-pass) failed (non-fatal)"
+  ( source "$HOME_DIR/.claude/id8labs-sub.env" 2>/dev/null; /usr/bin/python3 "$CORRECT" --hours 24 ) >> "$LOG_FILE" 2>&1 \
+    || log "correcting pass failed (non-fatal)"
+  if [ -f "$MISSES_JSON" ] && grep -q '"judge ' "$MISSES_JSON"; then
+    log "correcting pass: judge failed on the id8labs profile; retrying on the default profile"
+    env -u CLAUDE_CONFIG_DIR /usr/bin/python3 "$CORRECT" --hours 24 >> "$LOG_FILE" 2>&1 || log "correcting pass retry failed"
+  fi
+fi
+
 # Dream memory: the last two dreams (excluding the target day). Without this the
 # sweep has no idea what it already said and rehashes the same letter nightly.
-RECENT_DREAMS="$(for pf in $(ls -1 "$STORE_DIR"/dream-*.md 2>/dev/null | grep -v "dream-$DATE.md" | tail -2); do
+RECENT_DREAMS="$(for pf in $(printf '%s\n' "$STORE_DIR"/dream-*.md | grep -v "dream-$DATE.md" | tail -2); do
+  [ -f "$pf" ] || continue   # no dreams yet: the glob stays literal
   echo "[$(basename "$pf" .md | sed 's/dream-//')]"
   grep -vE '^#|^<!--|^>|^---|^\*Felt|^$' "$pf" 2>/dev/null | head -6
   echo
@@ -289,6 +308,11 @@ if [ "${DIVERGENCE:-0}" -ge 6 ]; then LOUD="LOUD"; BANNER="> **Read this one.** 
   echo "---"
   echo "*Felt vs actual: divergence $DIVERGENCE/10 ($DIRECTION). The one layer that never leaves the house.*"
 } > "$OUT"
+
+# The misses half joins the dream (written by the memory step near the top of this script).
+if [ "$BACKFILL" != 1 ] && [ -f "$MISSES_JSON" ]; then
+  /usr/bin/python3 "$CORRECT" section "$MISSES_JSON" >> "$OUT" 2>>"$LOG_FILE" || true
+fi
 
 [ "$OUT" != "$STORE_DIR/dream-$DATE.md" ] && cp "$OUT" "$STORE_DIR/dream-$DATE.md" 2>/dev/null || true
 log "dream written: divergence=$DIVERGENCE direction=$DIRECTION loud=$LOUD"
