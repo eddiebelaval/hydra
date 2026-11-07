@@ -458,9 +458,8 @@ def repeated_findings(dream=DREAM, nights=7, need=3):
             for ln in fh:
                 if not ln.startswith("- **"):
                     continue
-                for slug in set(re.findall(r"`([A-Za-z0-9_.\-]+\.md)`", ln)):
-                    if slug == "MEMORY.md":
-                        continue
+                # a finding is about its FIRST named file; the others are context (11/07: one bullet filed two rows)
+                for slug in [x for x in re.findall(r"`([A-Za-z0-9_.\-]+\.md)`", ln) if x != "MEMORY.md"][:1]:
                     seen.setdefault(slug, []).append((os.path.basename(f)[10:20], re.sub(r"\*\*", "", ln[2:]).strip()[:200]))
     return {s: v for s, v in seen.items() if len({d for d, _ in v}) >= need}
 
@@ -533,6 +532,8 @@ def run(hours=24, dry=False, use_llm=True, now=None, roots=ROOTS, mem=MEM, index
                 rep["errors"].append("recurrence %s: %s" % (les["file"], e))
         elif kind in ("recurred", "new"):
             twin = None if ch.dry else draft_match(v, waiting_drafts(dream))
+            if twin and m["source"] != "eddie" and not _from_eddie(twin["path"]):
+                twin = None                          # a lesson goes live only if Eddie himself hit it at least once
             if twin:
                 try:
                     rep["promoted"].append({"lesson": os.path.basename(promote(twin, v, m, date, ch, mem, index)),
@@ -548,7 +549,7 @@ def run(hours=24, dry=False, use_llm=True, now=None, roots=ROOTS, mem=MEM, index
                 board_row("fact:" + les["file"], "- [open: EDDIE] DREAM.fact-%s: your message %s says: %s. Memory note "
                           "`%s` may say otherwise; confirm and the note gets corrected." % (
                               les["file"][:-3], dt.datetime.fromtimestamp(m["ts"]).strftime("%m/%d %H:%M"),
-                              (v.get("summary") or "")[:200], les["file"]), ledger, ch, board)
+                              (v.get("summary") or "").rstrip(".")[:200], les["file"]), ledger, ch, board)
         else:
             rep["noise"] += 1
     rep["misses"] = len(rep["recurred"]) + len(rep["new"]) + len(rep["promoted"]) + len(rep["fact"])
@@ -568,6 +569,7 @@ def run(hours=24, dry=False, use_llm=True, now=None, roots=ROOTS, mem=MEM, index
                 rep["repeat_rows"].append(slug)
     except OSError as e:
         rep["errors"].append("repeats: %s" % e)
+    rep["changed"] = len([c for c in ch.log if not c["path"].startswith(os.path.join(dream, ""))])
     if not dry:
         os.makedirs(dream, exist_ok=True)
         with open(led_path, "w") as fh:
@@ -578,6 +580,14 @@ def run(hours=24, dry=False, use_llm=True, now=None, roots=ROOTS, mem=MEM, index
             fh.write(render(rep, ch.log))
     rep["changes"] = ch.log
     return rep
+
+
+def _from_eddie(path):
+    try:
+        with open(path, errors="replace") as fh:
+            return bool(re.search(r"^Source: eddie message", fh.read(), re.M))
+    except OSError:
+        return False
 
 
 def _key(m):
@@ -645,6 +655,9 @@ def section(rep):
         out.append("- Tidied: %d old lines moved off the memory index so the whole index loads again." % rep["index_moved"])
     if rep.get("errors"):
         out.append("- The correcting pass hit %d problem(s); see ~/.claude/dream/correct-%s.md." % (len(rep["errors"]), rep["date"]))
+    if rep.get("changed"):
+        out += ["", "%d memory change(s) tonight, every one backed up. Undo the night: `python3 ~/.hydra/tools/dream_correct.py "
+                "undo %s`. Details: ~/.claude/dream/correct-%s.md" % (rep["changed"], rep["date"], rep["date"])]
     return "\n".join(out) + "\n"
 
 

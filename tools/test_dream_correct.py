@@ -197,7 +197,7 @@ class Promote(Fake):
         os.utime(os.path.join(self.root, "-proj", "s1.jsonl"))
         self.forget()
         rep = D.run(hours=24 * 3, now=later, roots=[self.root], mem=self.mem, index=os.path.join(self.mem, "MEMORY.md"),
-                    dream=self.dream, board=self.board, model="t", judge_fn=self.judge([dict(self.V, summary="It failed open again.")]))
+                    dream=self.dream, board=self.board, model="t", judge_fn=self.judge([dict(self.V, i=0, summary="It failed open again.")]))
         self.assertEqual(1, len(rep["promoted"]))
         live = os.path.join(self.mem, rep["promoted"][0]["lesson"])
         txt = self.read(live)
@@ -207,6 +207,14 @@ class Promote(Fake):
         self.assertIn(rep["promoted"][0]["lesson"], self.read(os.path.join(self.mem, "MEMORY.md")))
         self.assertEqual([], D.waiting_drafts(self.dream), "the draft is marked promoted, not matched again")
         self.assertIsNotNone(D.parse_lesson(live), "the live lesson parses like any other")
+
+    def test_side_agent_only_patterns_never_go_live(self):
+        side = dict(self.V, i=2)                     # message 2 is the side-agent note
+        self.go([side])
+        self.forget()
+        rep = self.go([side])
+        self.assertEqual([], rep["promoted"])
+        self.assertEqual(1, len(rep["new"]))
 
     def test_a_draft_that_never_recurs_expires_and_is_kept(self):
         self.go([self.V])
